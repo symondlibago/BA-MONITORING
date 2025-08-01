@@ -1,0 +1,232 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: #ffffff; /* White background */
+  --foreground: #040e22; /* Darkest blue for text */
+  --card: #ffffff; /* White for cards */
+  --card-foreground: #040e22; /* Darkest blue text for cards */
+  --popover: #ffffff;
+  --popover-foreground: #040e22;
+  --primary: #202353; /* Medium dark blue */
+  --primary-foreground: #ffffff;
+  --secondary: #2d316a; /* Slightly lighter medium dark blue */
+  --secondary-foreground: #ffffff;
+  --muted: #0e1048;
+  --muted-foreground: #ffffff;
+  --accent: #2d316a; /* Using the lighter medium dark blue for accent */
+  --accent-foreground: #ffffff;
+  --destructive: #202353; /* Using a blue for destructive actions for uniformity */
+  --border: #e0e0e0; /* Light gray border for cards/tables */
+  --input: #ffffff; /* White input background */
+  --ring: #202353; /* Medium dark blue ring */
+  --chart-1: #202353; /* Medium dark blue */
+  --chart-2: #2d316a; /* Slightly lighter medium dark blue */
+  --chart-3: #0e1048; /* Dark blue */
+  --chart-4: #040e22; /* Darkest blue */
+  --chart-5: #ffffff; /* White */
+  --sidebar: #0e1048;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #202353;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #2d316a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #202353;
+  --sidebar-ring: #202353;
+}
+
+.dark {
+  --background: #ffffff;
+  --foreground: #040e22;
+  --card: #ffffff;
+  --card-foreground: #040e22;
+  --popover: #ffffff;
+  --popover-foreground: #040e22;
+  --primary: #202353;
+  --primary-foreground: #ffffff;
+  --secondary: #2d316a;
+  --secondary-foreground: #ffffff;
+  --muted: #0e1048;
+  --muted-foreground: #ffffff;
+  --accent: #2d316a;
+  --accent-foreground: #ffffff;
+  --destructive: #202353;
+  --border: #e0e0e0;
+  --input: #ffffff;
+  --ring: #202353;
+  --chart-1: #202353;
+  --chart-2: #2d316a;
+  --chart-3: #0e1048;
+  --chart-4: #040e22;
+  --chart-5: #ffffff;
+  --sidebar: #0e1048;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #202353;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #2d316a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #202353;
+  --sidebar-ring: #202353;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+
+/* Custom styles for collapsible sidebar */
+.sidebar-tooltip {
+  position: absolute;
+  left: 100%;
+  margin-left: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background-color: #0e1048;
+  color: white;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 50;
+  transition: opacity 0.2s ease-in-out;
+  backdrop-filter: blur(4px);
+  border: 1px solid #202353;
+}
+
+.sidebar-item:hover .sidebar-tooltip {
+  opacity: 1;
+}
+
+/* Smooth transitions for layout changes */
+.main-content {
+  transition: margin-left 0.3s ease-in-out, width 0.3s ease-in-out;
+}
+
+/* Enhanced hover effects */
+.nav-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(32, 35, 83, 0.1), transparent);
+  transition: left 0.5s ease-in-out;
+}
+
+.nav-item:hover::before {
+  left: 100%;
+}
+
+/* Active state glow effect */
+.nav-item-active {
+  box-shadow: 0 0 20px rgba(32, 35, 83, 0.3);
+}
+
+/* Pulse animation for status indicators */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.pulse-slow {
+  animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Scrollbar styling for sidebar */
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: #0e1048;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #2d316a;
+  border-radius: 2px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #202353;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .sidebar-mobile {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  .sidebar-mobile.open {
+    transform: translateX(0);
+  }
+}
+
+/* Focus states for accessibility */
+.nav-item:focus-visible {
+  outline: 2px solid rgba(32, 35, 83, 0.5);
+  outline-offset: 2px;
+}
+
+/* Backdrop blur for modern glass effect */
+.glass-effect {
+  backdrop-filter: blur(10px);
+  background: rgba(14, 16, 72, 0.8);
+}
+
