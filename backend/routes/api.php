@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\EquipmentController;
+use App\Http\Controllers\EmployeeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -34,4 +35,8 @@ Route::middleware('api')->group(function () {
     Route::apiResource('equipment', EquipmentController::class);
     Route::patch('equipment/{id}/borrow', [EquipmentController::class, 'borrow']);
     Route::patch('equipment/{id}/return', [EquipmentController::class, 'returnEquipment']);
+    
+    // Employee routes
+    Route::apiResource('employees', EmployeeController::class);
 });
+

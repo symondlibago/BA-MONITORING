@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, 
@@ -15,7 +15,8 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Button } from '@/components/ui/button.jsx'
@@ -352,7 +353,7 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
                       `₱${(parseFloat(formData.quantity) * parseFloat(formData.unitPrice)).toFixed(2)}` : 
                       '₱0.00'
                     }
-                    className="w-full px-3 py-2 bg-[var(--color-muted)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)]/70 cursor-not-allowed"
+                    className="w-full px-3 py-2 bg-gray-300 border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)]/70 cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -422,9 +423,8 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
   )
 }
 
-// Confirmation Modal Component
-function ConfirmationModal({ isOpen, onClose, onConfirm, title, message }) {
-  if (!isOpen) return null
+const DeleteConfirmationModal = React.memo(({ isOpen, onClose, onConfirm, isDeleting, expense }) => {
+  if (!isOpen || !expense) return null
 
   return (
     <AnimatePresence>
@@ -432,40 +432,73 @@ function ConfirmationModal({ isOpen, onClose, onConfirm, title, message }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-        onClick={onClose}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        onClick={() => !isDeleting && onClose()}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ duration: 0.3 }}
-          className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg shadow-xl max-w-sm w-full p-6"
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.9, opacity: 0, y: 20 }}
+          className="bg-white rounded-lg shadow-xl max-w-md w-full"
           onClick={(e) => e.stopPropagation()}
         >
-          <h3 className="text-xl font-bold mb-4 text-[var(--color-foreground)]">{title}</h3>
-          <p className="text-[var(--color-foreground)]/70 mb-6">{message}</p>
-          <div className="flex justify-end space-x-3">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={onConfirm}
-              className="bg-red-500 hover:bg-red-600 text-white"
-            >
-              Confirm
-            </Button>
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Confirm Deletion</h2>
+              <Button variant="ghost" size="sm" onClick={onClose} disabled={isDeleting}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <Trash2 className="h-5 w-5 text-red-600" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">
+                    Are you sure you want to delete this expense? This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-900 mb-1 truncate" title={expense.description}>{expense.description}</h3>
+                <p className="text-sm text-gray-600">OR/SI No: {expense.or_si_no}</p>
+                <p className="text-sm text-gray-600">Total: ₱{parseFloat(expense.total_price).toFixed(2)}</p>
+              </div>
+            </div>
+
+            <div className="flex space-x-3">
+              <Button variant="outline" className="flex-1" onClick={onClose} disabled={isDeleting}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                onClick={onConfirm}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Expense
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
   )
-}
+})
 
 // Pagination Component
 function Pagination({ currentPage, totalPages, onPageChange }) {
@@ -554,23 +587,44 @@ const units = ['pc', 'pcs', 'set', 'kg', 'length', 'pack', 'box', 'gal', 'roll',
 // API base URL - adjust this to match your Laravel backend URL
 const API_BASE_URL = 'http://localhost:8000/api'
 
-function ExpensesReceipts() {
+function ExpensesReceipts( ) {
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [showExpenseModal, setShowExpenseModal] = useState(false)
   const [editingExpense, setEditingExpense] = useState(null)
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [expenseToDelete, setExpenseToDelete] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
+
+  const [modals, setModals] = useState({
+    delete: { isOpen: false, isDeleting: false, expense: null }
+  })
+
+  // Alert function from EquipmentInventory
+  const showAlert = useCallback((message, type = 'info') => {
+    const alertDiv = document.createElement('div')
+    alertDiv.className = `fixed top-4 right-4 z-[9999] px-6 py-4 rounded-lg shadow-lg text-white font-medium transition-all duration-300 transform translate-x-full`
+    
+    switch (type) {
+      case 'success': alertDiv.className += ' bg-green-500'; break
+      case 'error': alertDiv.className += ' bg-red-500'; break
+      case 'warning': alertDiv.className += ' bg-yellow-500'; break
+      default: alertDiv.className += ' bg-blue-500'
+    }
+    
+    alertDiv.textContent = message
+    document.body.appendChild(alertDiv)
+    
+    setTimeout(() => alertDiv.classList.remove('translate-x-full'), 100)
+    setTimeout(() => {
+      alertDiv.classList.add('translate-x-full')
+      setTimeout(() => document.body.removeChild(alertDiv), 300)
+    }, 3000)
+  }, [])
 
   // Fetch expenses from backend
-  const fetchExpenses = async () => {
+  const fetchExpenses = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`${API_BASE_URL}/expenses`)
@@ -578,59 +632,46 @@ function ExpensesReceipts() {
       
       if (data.success) {
         setExpenses(data.data)
-        setError(null)
       } else {
-        setError('Failed to fetch expenses')
+        showAlert('Failed to fetch expenses: ' + data.message, 'error')
       }
     } catch (err) {
-      setError('Error connecting to server')
-      console.error('Error fetching expenses:', err)
+      showAlert('Error connecting to server: ' + err.message, 'error')
     } finally {
       setLoading(false)
     }
-  }
+  }, [showAlert])
 
   // Add or Update expense
-  const handleSaveExpense = async (expenseData) => {
+  const handleSaveExpense = useCallback(async (expenseData) => {
     try {
       let response
-      if (expenseData.id) {
-        response = await fetch(`${API_BASE_URL}/expenses/${expenseData.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(expenseData)
-        })
-      } else {
-        response = await fetch(`${API_BASE_URL}/expenses`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(expenseData)
-        })
-      }
+      const url = expenseData.id ? `${API_BASE_URL}/expenses/${expenseData.id}` : `${API_BASE_URL}/expenses`
+      const method = expenseData.id ? 'PUT' : 'POST'
+
+      response = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(expenseData)
+      })
       
       const data = await response.json()
       
       if (data.success) {
         fetchExpenses()
-        setError(null)
-        setSuccessMessage(expenseData.id ? 'Expense updated successfully!' : 'Expense added successfully!')
-        setShowSuccessAlert(true)
-        setTimeout(() => setShowSuccessAlert(false), 3000)
+        const message = expenseData.id ? 'Expense updated successfully!' : 'Expense added successfully!'
+        showAlert(message, 'success')
       } else {
-        setError(data.message || `Failed to ${expenseData.id ? 'update' : 'add'} expense`)
+        const errorMsg = data.errors ? Object.values(data.errors).flat().join(', ') : data.message
+        showAlert('Error: ' + errorMsg, 'error')
       }
     } catch (err) {
-      setError(`Error ${expenseData.id ? 'updating' : 'adding'} expense`)
-      console.error(`Error ${expenseData.id ? 'updating' : 'adding'} expense:`, err)
+      showAlert(`Failed to ${expenseData.id ? 'update' : 'add'} expense: ` + err.message, 'error')
     }
-  }
+  }, [fetchExpenses, showAlert])
 
   // Handle edit button click
-  const handleEditClick = (expense) => {
+  const handleEditClick = useCallback((expense) => {
     setEditingExpense({
       id: expense.id,
       orSiNo: expense.or_si_no,
@@ -646,45 +687,49 @@ function ExpensesReceipts() {
       store: expense.store
     })
     setShowExpenseModal(true)
-  }
+  }, [])
 
-  // Handle delete button click
-  const handleDeleteClick = (expenseId) => {
-    setExpenseToDelete(expenseId)
-    setShowConfirmModal(true)
-  }
+  // Delete modal handlers
+  const openDeleteModal = useCallback((expense) => {
+    setModals(prev => ({ ...prev, delete: { isOpen: true, isDeleting: false, expense } }))
+  }, [])
+
+  const closeDeleteModal = useCallback(() => {
+    setModals(prev => ({ ...prev, delete: { isOpen: false, isDeleting: false, expense: null } }))
+  }, [])
 
   // Confirm delete action
-  const confirmDelete = async () => {
+  const confirmDelete = useCallback(async () => {
+    const expenseId = modals.delete.expense?.id
+    if (!expenseId) return
+
+    setModals(prev => ({ ...prev, delete: { ...prev.delete, isDeleting: true } }))
+
     try {
-      const response = await fetch(`${API_BASE_URL}/expenses/${expenseToDelete}`, {
+      const response = await fetch(`${API_BASE_URL}/expenses/${expenseId}`, {
         method: 'DELETE'
       })
       
       const data = await response.json()
       
       if (data.success) {
+        showAlert('Expense deleted successfully!', 'success')
+        closeDeleteModal()
         fetchExpenses()
-        setError(null)
-        setSuccessMessage('Expense deleted successfully!')
-        setShowSuccessAlert(true)
-        setTimeout(() => setShowSuccessAlert(false), 3000)
       } else {
-        setError(data.message || 'Failed to delete expense')
+        showAlert('Error: ' + data.message, 'error')
       }
     } catch (err) {
-      setError('Error deleting expense')
-      console.error('Error deleting expense:', err)
+      showAlert('Failed to delete expense: ' + err.message, 'error')
     } finally {
-      setShowConfirmModal(false)
-      setExpenseToDelete(null)
+      setModals(prev => ({ ...prev, delete: { ...prev.delete, isDeleting: false } }))
     }
-  }
+  }, [showAlert, closeDeleteModal, fetchExpenses, modals.delete.expense])
 
   // Load expenses on component mount
   useEffect(() => {
     fetchExpenses()
-  }, [])
+  }, [fetchExpenses])
 
   // Filter and search logic
   const filteredExpenses = useMemo(() => {
@@ -700,7 +745,7 @@ function ExpensesReceipts() {
 
   // Pagination logic
   const totalPages = Math.ceil(filteredExpenses.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
+  const startIndex = (currentPage- 1) * itemsPerPage
   const paginatedExpenses = filteredExpenses.slice(startIndex, startIndex + itemsPerPage)
 
   // Reset to first page when filters change
@@ -770,39 +815,6 @@ function ExpensesReceipts() {
           </Button>
         </div>
       </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          {error}
-        </div>
-      )}
-
-      {/* Success Alert */}
-      <AnimatePresence>
-        {showSuccessAlert && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded flex items-center justify-between"
-          >
-            <div className="flex items-center">
-              <CheckCircle className="h-5 w-5 mr-2" />
-              {successMessage}
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSuccessAlert(false)}
-              className="text-green-700/70 hover:bg-green-100"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -989,7 +1001,7 @@ function ExpensesReceipts() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleDeleteClick(expense.id)}
+                            onClick={() => openDeleteModal(expense)}
                             className="text-red-500 hover:bg-red-500"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -1027,12 +1039,12 @@ function ExpensesReceipts() {
       />
 
       {/* Confirmation Modal (Delete) */}
-      <ConfirmationModal
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
+      <DeleteConfirmationModal
+        isOpen={modals.delete.isOpen}
+        onClose={closeDeleteModal}
         onConfirm={confirmDelete}
-        title="Confirm Deletion"
-        message="Are you sure you want to delete this expense? This action cannot be undone."
+        isDeleting={modals.delete.isDeleting}
+        expense={modals.delete.expense}
       />
     </div>
   )

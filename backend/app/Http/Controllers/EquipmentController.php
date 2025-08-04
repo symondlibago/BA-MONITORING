@@ -181,7 +181,9 @@ class EquipmentController extends Controller
                 'borrowed_by' => 'required|string|max:255',
                 'date_borrowed' => 'required|date',
                 'expected_return_date' => 'nullable|date',
-                'purpose_notes' => 'nullable|string'
+                'purpose_notes' => 'nullable|string',
+                'presnet_location' => 'required|string|max:255'
+
             ]);
 
             $equipment->update([
@@ -189,7 +191,9 @@ class EquipmentController extends Controller
                 'borrowed_by' => $validatedData['borrowed_by'],
                 'date_borrowed' => $validatedData['date_borrowed'],
                 'expected_return_date' => $validatedData['expected_return_date'] ?? null,
-                'purpose_notes' => $validatedData['purpose_notes'] ?? null
+                'purpose_notes' => $validatedData['purpose_notes'] ?? null,
+                'present_location' => $validatedData['present_location']
+
             ]);
 
             return response()->json([
@@ -234,7 +238,9 @@ class EquipmentController extends Controller
                 'borrowed_by' => null,
                 'date_borrowed' => null,
                 'expected_return_date' => null,
-                'purpose_notes' => null
+                'purpose_notes' => null,
+                'present_location' => null
+
             ]);
 
             return response()->json([

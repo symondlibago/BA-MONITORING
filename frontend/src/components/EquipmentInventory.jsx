@@ -112,7 +112,6 @@ const AddModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting }) => {
         brand: '',
         serial_number: '',
         item_status: 'Available',
-        present_location: '',
         status: ''
       })
     }
@@ -237,17 +236,6 @@ const AddModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting }) => {
                   placeholder="Select condition (optional)"
                   disabled={isSubmitting}
                 />
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Present Location</label>
-                  <input
-                    type="text"
-                    value={formData.present_location}
-                    onChange={(e) => handleInputChange('present_location', e.target.value)}
-                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-                    placeholder="Enter present location (optional)"
-                    disabled={isSubmitting}
-                  />
-                </div>
               </div>
             </div>
 
@@ -325,6 +313,7 @@ const EditModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting, equipme
       submitData.date_borrowed = ''
       submitData.expected_return_date = ''
       submitData.purpose_notes = ''
+      submitData.present_location = ''
     }
     
     onSubmit(submitData)
@@ -507,7 +496,8 @@ const BorrowModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting, equip
     borrowed_by: '',
     date_borrowed: new Date().toISOString().split('T')[0],
     expected_return_date: '',
-    purpose_notes: ''
+    purpose_notes: '',
+    present_location: ''
   })
 
   const handleInputChange = useCallback((field, value) => {
@@ -592,6 +582,19 @@ const BorrowModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting, equip
                     disabled={isSubmitting}
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Borrowed By <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.present_location}
+                    onChange={(e) => handleInputChange('present_location', e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                    placeholder="Enter present location"
+                    disabled={isSubmitting}
+                  />
+                </div>
                 <div></div> {/* Empty div for spacing */}
               </div>
 
@@ -635,6 +638,83 @@ const BorrowModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting, equip
   )
 })
 
+const DeleteConfirmationModal = React.memo(({ isOpen, onClose, onConfirm, isDeleting, equipment }) => {
+  if (!isOpen || !equipment) return null
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        onClick={() => !isDeleting && onClose()}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.9, opacity: 0, y: 20 }}
+          className="bg-white rounded-lg shadow-xl max-w-md w-full"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Confirm Deletion</h2>
+              <Button variant="ghost" size="sm" onClick={onClose} disabled={isDeleting}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <Trash2 className="h-5 w-5 text-red-600" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">
+                    Are you sure you want to delete this equipment? This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-900 mb-1">{equipment.equipment_name}</h3>
+                <p className="text-sm text-gray-600">Code: {equipment.equipment_code}</p>
+                <p className="text-sm text-gray-600">Brand: {equipment.brand}</p>
+              </div>
+            </div>
+
+            <div className="flex space-x-3">
+              <Button variant="outline" className="flex-1" onClick={onClose} disabled={isDeleting}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                onClick={onConfirm}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Equipment
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+})
+
 const EquipmentInventory = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
@@ -648,7 +728,8 @@ const EquipmentInventory = () => {
   const [modals, setModals] = useState({
     add: { isOpen: false, isSubmitting: false },
     edit: { isOpen: false, isSubmitting: false, equipment: null },
-    borrow: { isOpen: false, isSubmitting: false, equipment: null }
+    borrow: { isOpen: false, isSubmitting: false, equipment: null },
+    delete: { isOpen: false, isDeleting: false, equipment: null }
   })
 
   const API_BASE_URL = 'http://localhost:8000/api'
@@ -735,6 +816,14 @@ const EquipmentInventory = () => {
     setModals(prev => ({ ...prev, borrow: { isOpen: false, isSubmitting: false, equipment: null } }))
   }, [])
 
+  const openDeleteModal = useCallback((equipment) => {
+    setModals(prev => ({ ...prev, delete: { isOpen: true, isDeleting: false, equipment } }))
+  }, [])
+
+  const closeDeleteModal = useCallback(() => {
+    setModals(prev => ({ ...prev, delete: { isOpen: false, isDeleting: false, equipment: null } }))
+  }, [])
+
   // API handlers
   const handleAddEquipment = useCallback(async (formData) => {
     setModals(prev => ({ ...prev, add: { ...prev.add, isSubmitting: true } }))
@@ -813,8 +902,11 @@ const EquipmentInventory = () => {
     }
   }, [showAlert, closeBorrowModal, fetchEquipment, modals.borrow.equipment])
 
-  const handleDeleteEquipment = useCallback(async (equipmentId) => {
-    if (!confirm('Are you sure you want to delete this equipment?')) return
+  const handleDeleteEquipment = useCallback(async () => {
+    const equipmentId = modals.delete.equipment?.id
+    if (!equipmentId) return
+
+    setModals(prev => ({ ...prev, delete: { ...prev.delete, isDeleting: true } }))
 
     try {
       const response = await fetch(`${API_BASE_URL}/equipment/${equipmentId}`, {
@@ -824,14 +916,17 @@ const EquipmentInventory = () => {
 
       if (data.success) {
         showAlert('Equipment deleted successfully!', 'success')
+        closeDeleteModal()
         fetchEquipment()
       } else {
         showAlert('Error: ' + data.message, 'error')
       }
     } catch (error) {
       showAlert('Failed to delete equipment: ' + error.message, 'error')
+    } finally {
+      setModals(prev => ({ ...prev, delete: { ...prev.delete, isDeleting: false } }))
     }
-  }, [showAlert, fetchEquipment])
+  }, [showAlert, closeDeleteModal, fetchEquipment, modals.delete.equipment])
 
   // Filtered equipment
   const filteredEquipment = useMemo(() => {
@@ -1011,19 +1106,19 @@ const EquipmentInventory = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="flex flex-col sm:flex-row gap-4"
+        className="flex flex-col sm:flex-row items-center gap-4"
       >
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-foreground)]/40 h-4 w-4" />
-          <Input
-            placeholder="Search equipment..."
+        <input
+            type="text"
+            placeholder="Search by Equipment Name, Equipment Code, Brand"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-[var(--color-card)] border-[var(--color-border)] text-[var(--color-foreground)]"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
           />
         </div>
         
-        <div className="min-w-[200px]">
+        <div className="w-full sm:w-auto sm:min-w-[200px]">
           <CustomDropdown
             value={statusFilter}
             onChange={setStatusFilter}
@@ -1032,7 +1127,7 @@ const EquipmentInventory = () => {
           />
         </div>
 
-        <div className="min-w-[200px]">
+        <div className="w-full sm:w-auto sm:min-w-[200px]">
           <CustomDropdown
             value={conditionFilter}
             onChange={setConditionFilter}
@@ -1110,7 +1205,7 @@ const EquipmentInventory = () => {
                             <Button 
                               size="sm" 
                               variant="outline" 
-                              className="border-[var(--color-primary)]/30 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20"
+                              className="text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
                               onClick={() => openBorrowModal(item)}
                               disabled={item.item_status !== 'Available'}
                               title="Borrow Equipment"
@@ -1120,7 +1215,7 @@ const EquipmentInventory = () => {
                             <Button 
                               size="sm" 
                               variant="outline" 
-                              className="border-[var(--color-secondary)]/30 text-[var(--color-secondary)] hover:bg-[var(--color-secondary)]/20"
+                              className="text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
                               onClick={() => openEditModal(item)}
                               title="Edit Equipment"
                             >
@@ -1129,8 +1224,8 @@ const EquipmentInventory = () => {
                             <Button 
                               size="sm" 
                               variant="outline" 
-                              className="border-[var(--color-destructive)]/30 text-[var(--color-destructive)] hover:bg-[var(--color-destructive)]/20"
-                              onClick={() => handleDeleteEquipment(item.id)}
+                              className="text-[var(--color-foreground)]/70 hover:bg-red-500"
+                              onClick={() => openDeleteModal(item)}
                               title="Delete Equipment"
                             >
                               <Trash2 className="h-3 w-3" />
@@ -1239,6 +1334,14 @@ const EquipmentInventory = () => {
         onSubmit={handleBorrowEquipment}
         isSubmitting={modals.borrow.isSubmitting}
         equipment={modals.borrow.equipment}
+      />
+      
+      <DeleteConfirmationModal
+        isOpen={modals.delete.isOpen}
+        onClose={closeDeleteModal}
+        onConfirm={handleDeleteEquipment}
+        isDeleting={modals.delete.isDeleting}
+        equipment={modals.delete.equipment}
       />
     </div>
   )
