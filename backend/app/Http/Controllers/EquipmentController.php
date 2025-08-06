@@ -182,7 +182,7 @@ class EquipmentController extends Controller
                 'date_borrowed' => 'required|date',
                 'expected_return_date' => 'nullable|date',
                 'purpose_notes' => 'nullable|string',
-                'presnet_location' => 'required|string|max:255'
+                'present_location' => 'required|string|max:255'
 
             ]);
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\PayrollController;
 
 /*
 |--------------------------------------------------------------------------
@@ -38,5 +39,13 @@ Route::middleware('api')->group(function () {
     
     // Employee routes
     Route::apiResource('employees', EmployeeController::class);
+    
+    // Payroll routes
+    Route::apiResource('payrolls', PayrollController::class);
+    Route::get('employees/status/{status}', [PayrollController::class, 'getEmployeesByStatus']);
+    Route::patch('payrolls/{id}/status', [PayrollController::class, 'updateStatus']);
+    
+    // New route for attendance details
+    Route::get('payrolls/{id}/attendance', [PayrollController::class, 'getAttendanceDetails']);
 });
 

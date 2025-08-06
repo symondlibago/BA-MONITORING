@@ -584,7 +584,7 @@ const BorrowModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting, equip
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Borrowed By <span className="text-red-500">*</span>
+                    Present Location <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"

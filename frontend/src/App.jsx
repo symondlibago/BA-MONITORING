@@ -36,20 +36,20 @@ const navigationItems = [
   { path: '/employees', icon: Users, label: 'Employee Management', color: 'text-white' },
 ]
 
-function Sidebar({ isCollapsed, toggleSidebar, onLogout }) {
+function Sidebar({ isCollapsed, toggleSidebar, onLogout, isMobile, closeMobileSidebar }) {
   const location = useLocation()
 
   return (
     <motion.div
       initial={false}
-      animate={{ width: isCollapsed ? 80 : 280 }}
+      animate={{ width: isCollapsed && !isMobile ? 80 : isMobile && !isCollapsed ? '100%' : 280, x: isMobile && isCollapsed ? '-100%' : 0 }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
       className="fixed left-0 top-0 h-full bg-[var(--color-sidebar)] border-r border-[var(--color-sidebar-border)] z-50 flex flex-col"
     >
       {/* Header with toggle button */}
       <div className="flex items-center justify-between p-4 border-b border-[var(--color-sidebar-border)] h-16">
         <AnimatePresence mode="wait">
-          {!isCollapsed && (
+          {(!isCollapsed || isMobile) && (
             <motion.h1
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -68,7 +68,7 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout }) {
           onClick={toggleSidebar}
           className="text-[var(--color-sidebar-foreground)] hover:bg-[var(--color-sidebar-accent)] ml-auto"
         >
-          {isCollapsed ? (
+          {isCollapsed && !isMobile ? (
             <ChevronRight className="h-5 w-5" />
           ) : (
             <ChevronLeft className="h-5 w-5" />
@@ -89,7 +89,7 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout }) {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.05 + 0.1 }}
             >
-              <Link to={item.path}>
+              <Link to={item.path} onClick={isMobile ? closeMobileSidebar : undefined}>
               <motion.div
                   whileHover={{ scale: 1.02, x: 2 }}
                   whileTap={{ scale: 0.98 }}
@@ -106,7 +106,7 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout }) {
 
 
                   <AnimatePresence mode="wait">
-                    {!isCollapsed && (
+                    {(!isCollapsed || isMobile) && (
                       <motion.span
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -132,7 +132,7 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout }) {
 
 
                   {/* Tooltip for collapsed state */}
-                  {isCollapsed && (
+                  {isCollapsed && !isMobile && (
                     <div className="absolute left-full ml-2 px-2 py-1 bg-[var(--color-sidebar-accent)] text-[var(--color-sidebar-accent-foreground)] text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
                       {item.label}
                     </div>
@@ -156,7 +156,7 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout }) {
 
     {/* Animated Logout Text (only if expanded) */}
     <AnimatePresence mode="wait">
-      {!isCollapsed && (
+      {(!isCollapsed || isMobile) && (
         <motion.span
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
@@ -170,7 +170,7 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout }) {
     </AnimatePresence>
 
     {/* Tooltip for collapsed state */}
-    {isCollapsed && (
+    {isCollapsed && !isMobile && (
       <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-[var(--color-sidebar-accent)] text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg">
         Logout
       </div>
@@ -185,9 +185,9 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout }) {
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
     transition={{ delay: 0.5 }}
-    className={`${isCollapsed ? 'flex justify-center' : ''}`}
+    className={`${isCollapsed && !isMobile ? 'flex justify-center' : ''}`}
   >
-    {isCollapsed ? (
+    {isCollapsed && !isMobile ? (
       <div className="flex flex-col space-y-1">
         <div className="w-2 h-2 bg-[var(--color-chart-1)] rounded-full animate-pulse"></div>
         <div
@@ -213,15 +213,15 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout }) {
   )
 }
 
-function MainContent({ sidebarCollapsed, onLogout }) {
+function MainContent({ sidebarCollapsed, onLogout, isMobile }) {
   const location = useLocation()
 
   return (
     <motion.main
       initial={false}
       animate={{
-        marginLeft: sidebarCollapsed ? 80 : 280,
-        width: sidebarCollapsed ? 'calc(100% - 80px)' : 'calc(100% - 280px)'
+        marginLeft: isMobile ? 0 : (sidebarCollapsed ? 80 : 280),
+        width: isMobile ? '100%' : (sidebarCollapsed ? 'calc(100% - 80px)' : 'calc(100% - 280px)')
       }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
       className="min-h-screen"
@@ -251,6 +251,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [user, setUser] = useState(null)
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
 
   useEffect(() => {
     // Check if user is already authenticated on app load
@@ -258,7 +259,24 @@ function App() {
       setIsLoggedIn(true)
       setUser(getUser())
     }
+
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
   }, [])
+
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarCollapsed(true) // Collapse sidebar by default on mobile
+    } else {
+      setSidebarCollapsed(false) // Expand sidebar by default on desktop
+    }
+  }, [isMobile])
 
   const handleLogin = (userData) => {
     setIsLoggedIn(true)
@@ -276,18 +294,39 @@ function App() {
     setSidebarCollapsed(!sidebarCollapsed)
   }
 
+  const closeMobileSidebar = () => {
+    if (isMobile) {
+      setSidebarCollapsed(true)
+    }
+  }
+
   return (
     <Router>
       <div className="min-h-screen bg-[var(--color-background)] text-[var(--color-foreground)]">
+        {isLoggedIn && isMobile && (
+          <div className="mobile-menu-button-container">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSidebar}
+              className="mobile-menu-button"
+            >
+              {sidebarCollapsed ? <Menu className="h-6 w-6" /> : <X className="h-6 w-6" />}
+            </Button>
+          </div>
+        )}
         <ProtectedRoute onLogin={handleLogin}>
           <Sidebar
             isCollapsed={sidebarCollapsed}
             toggleSidebar={toggleSidebar}
             onLogout={handleLogout}
+            isMobile={isMobile}
+            closeMobileSidebar={closeMobileSidebar}
           />
           <MainContent
             sidebarCollapsed={sidebarCollapsed}
             onLogout={handleLogout}
+            isMobile={isMobile}
           />
         </ProtectedRoute>
       </div>

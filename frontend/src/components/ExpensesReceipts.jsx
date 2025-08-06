@@ -21,7 +21,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import * as XLSX from 'xlsx'
-
+import API_BASE_URL from './Config'
 // Custom Dropdown Component
 function CustomDropdown({ options, value, onChange, placeholder, className = "", disabled = false }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -585,7 +585,6 @@ const categories = ['All', 'Plumbing', 'Electrical', 'Safety', 'Structural/Paint
 const units = ['pc', 'pcs', 'set', 'kg', 'length', 'pack', 'box', 'gal', 'roll', 'bags', 'can', 'liter', 'others']
 
 // API base URL - adjust this to match your Laravel backend URL
-const API_BASE_URL = 'http://localhost:8000/api'
 
 function ExpensesReceipts( ) {
   const [expenses, setExpenses] = useState([])

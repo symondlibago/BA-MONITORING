@@ -23,6 +23,7 @@ import {
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
+import API_BASE_URL from './Config'
 
 // Custom Dropdown Component
 const CustomDropdown = React.memo(({ label, required = false, value, onChange, options, placeholder, disabled = false, className = "" }) => {
@@ -710,7 +711,6 @@ const Employee = () => {
   const [successAlert, setSuccessAlert] = useState({ isVisible: false, message: '' })
 
   // API base URL - adjust this to match your Laravel backend
-  const API_BASE_URL = 'http://localhost:8000/api'
 
   // Fetch employees from backend
   const fetchEmployees = useCallback(async () => {
