@@ -7,6 +7,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\PayrollController;
+use App\Http\Controllers\EmployeeCashAdvanceController;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,33 +21,37 @@ use App\Http\Controllers\PayrollController;
 */
 
 // Public routes
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post("/register", [AuthController::class, "register"]);
+Route::post("/login", [AuthController::class, "login"]);
 
 // Expense routes (public for now, can be protected later)
-Route::apiResource('expenses', ExpenseController::class);
-Route::get('expenses/stats/mop', [ExpenseController::class, 'getMopStats']);
+Route::apiResource("expenses", ExpenseController::class);
 
 // Protected routes
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/user', [AuthController::class, 'user']);
-    Route::post('/logout', [AuthController::class, 'logout']);
+Route::middleware("auth:sanctum")->group(function () {
+    Route::get("/user", [AuthController::class, "user"]);
+    Route::post("/logout", [AuthController::class, "logout"]);
 });
 
-Route::middleware('api')->group(function () {
-    Route::apiResource('equipment', EquipmentController::class);
-    Route::patch('equipment/{id}/borrow', [EquipmentController::class, 'borrow']);
-    Route::patch('equipment/{id}/return', [EquipmentController::class, 'returnEquipment']);
+Route::middleware("api")->group(function () {
+    Route::apiResource("equipment", EquipmentController::class);
+    Route::patch("equipment/{id}/borrow", [EquipmentController::class, "borrow"]);
+    Route::patch("equipment/{id}/return", [EquipmentController::class, "returnEquipment"]);
     
     // Employee routes
-    Route::apiResource('employees', EmployeeController::class);
+    Route::apiResource("employees", EmployeeController::class);
     
     // Payroll routes
-    Route::apiResource('payrolls', PayrollController::class);
-    Route::get('employees/status/{status}', [PayrollController::class, 'getEmployeesByStatus']);
-    Route::patch('payrolls/{id}/status', [PayrollController::class, 'updateStatus']);
+    Route::apiResource("payrolls", PayrollController::class);
+    Route::get("employees/status/{status}", [PayrollController::class, "getEmployeesByStatus"]);
+    Route::patch("payrolls/{id}/status", [PayrollController::class, "updateStatus"]);
     
     // New route for attendance details
-    Route::get('payrolls/{id}/attendance', [PayrollController::class, 'getAttendanceDetails']);
+    Route::get("payrolls/{id}/attendance", [PayrollController::class, "getAttendanceDetails"]);
+    
+    // Employee Cash Advance routes
+    Route::get("cash-advances", [EmployeeCashAdvanceController::class, "index"]);
+    Route::get("cash-advances/employee/{employeeId}", [EmployeeCashAdvanceController::class, "getByEmployee"]);
+    Route::post("cash-advances", [EmployeeCashAdvanceController::class, "store"]);
+    Route::post("cash-advances/update-balance", [EmployeeCashAdvanceController::class, "updateBalance"]);
 });
-

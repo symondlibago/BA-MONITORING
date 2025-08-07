@@ -252,4 +252,3 @@ class EmployeeController extends Controller
         return $prefix . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
     }
 }
-

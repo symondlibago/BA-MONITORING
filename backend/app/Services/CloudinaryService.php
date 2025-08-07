@@ -2,232 +2,134 @@
 
 namespace App\Services;
 
-use Cloudinary\Cloudinary;
-use Cloudinary\Api\Upload\UploadApi;
-use Cloudinary\Api\Admin\AdminApi;
-use Exception;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
+use Cloudinary\Cloudinary;
+use Cloudinary\Exception\ConfigurationException;
 
 class CloudinaryService
 {
-    protected $cloudinary;
-    protected $uploadApi;
-    protected $adminApi;
+    protected $cloudinary = null;
 
+    /**
+     * Constructor - safely initialize Cloudinary if possible
+     */
     public function __construct()
     {
-        // Cloudinary config from .env
-        $this->cloudinary = new Cloudinary([
-            'cloud' => [
-                'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
-                'api_key'    => env('CLOUDINARY_API_KEY'),
-                'api_secret' => env('CLOUDINARY_API_SECRET'),
-            ],
-            'url' => ['secure' => true],
-        ]);
-
-        $this->uploadApi = new UploadApi();
-        $this->adminApi = new AdminApi();
-    }
-
-    public function uploadImage($file, $folder = 'uploads', $options = [])
-    {
         try {
-            $defaultOptions = [
-                'folder' => $folder,
-                'resource_type' => 'image',
-                'quality' => 'auto:good',
-                'fetch_format' => 'auto',
-                'flags' => 'progressive',
-                'transformation' => [
-                    'width' => 1200,
-                    'height' => 1200,
-                    'crop' => 'limit',
-                    'quality' => 'auto:good',
-                ]
-            ];
-
-            $uploadOptions = array_merge($defaultOptions, $options);
-            $result = $this->uploadApi->upload($file->getPathname(), $uploadOptions);
-
-            return [
-                'success' => true,
-                'public_id' => $result['public_id'],
-                'secure_url' => $result['secure_url'],
-                'url' => $result['url'],
-                'width' => $result['width'],
-                'height' => $result['height'],
-                'format' => $result['format'],
-                'bytes' => $result['bytes'],
-            ];
-        } catch (Exception $e) {
-            Log::error('Cloudinary upload failed: ' . $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage()];
+            $this->cloudinary = new Cloudinary([
+                'cloud' => [
+                    'cloud_name' => config('services.cloudinary.cloud_name'),
+                    'api_key' => config('services.cloudinary.api_key'),
+                    'api_secret' => config('services.cloudinary.api_secret'),
+                ],
+            ]);
+        } catch (ConfigurationException $e) {
+            // Log the error but don't throw it
+            Log::warning('Cloudinary configuration error: ' . $e->getMessage());
+            $this->cloudinary = null;
         }
     }
 
-    public function uploadMultipleImages($files, $folder = 'uploads', $options = [])
+    /**
+     * Check if Cloudinary service is available
+     */
+    public function isAvailable(): bool
     {
-        $results = [];
+        return $this->cloudinary !== null;
+    }
+
+    /**
+     * Validate multiple images
+     */
+    public function validateMultipleImages(array $files): array
+    {
+        $validFiles = [];
         $errors = [];
-        $successCount = 0;
 
         foreach ($files as $index => $file) {
-            $customOptions = array_merge($options, [
-                'public_id' => $folder . '_' . time() . '_' . $index
-            ]);
-
-            $result = $this->uploadImage($file, $folder, $customOptions);
-
-            if ($result['success']) {
-                $results[] = $result;
-                $successCount++;
-            } else {
-                $errors[] = "File {$index}: " . $result['error'];
+            if (!$file instanceof UploadedFile) {
+                $errors[] = "File at index {$index} is not a valid upload";
+                continue;
             }
-        }
 
-        return [
-            'success' => $successCount > 0,
-            'results' => $results,
-            'errors' => $errors,
-            'uploaded_count' => $successCount,
-            'total_count' => count($files),
-        ];
-    }
-
-    public function deleteImage($publicId)
-    {
-        try {
-            $result = $this->uploadApi->destroy($publicId);
-
-            return [
-                'success' => $result['result'] === 'ok',
-                'result' => $result['result'],
-            ];
-        } catch (Exception $e) {
-            Log::error('Cloudinary delete failed: ' . $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-    }
-
-    public function deleteMultipleImages($publicIds)
-    {
-        $results = [];
-        $errors = [];
-        $successCount = 0;
-
-        foreach ($publicIds as $publicId) {
-            $result = $this->deleteImage($publicId);
-
-            if ($result['success']) {
-                $results[] = $result;
-                $successCount++;
-            } else {
-                $errors[] = "Failed to delete {$publicId}: " . $result['error'];
+            // Check file size (5MB max)
+            if ($file->getSize() > 5 * 1024 * 1024) {
+                $errors[] = "File {$file->getClientOriginalName()} exceeds 5MB limit";
+                continue;
             }
-        }
 
-        return [
-            'success' => $successCount > 0,
-            'results' => $results,
-            'errors' => $errors,
-            'deleted_count' => $successCount,
-            'total_count' => count($publicIds),
-        ];
-    }
+            // Check file type
+            $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+            if (!in_array($file->getMimeType(), $allowedMimes)) {
+                $errors[] = "File {$file->getClientOriginalName()} is not a valid image type";
+                continue;
+            }
 
-    public function getOptimizedUrl($publicId, $transformations = [])
-    {
-        try {
-            $finalTransformations = array_merge([
-                'quality' => 'auto:good',
-                'fetch_format' => 'auto',
-            ], $transformations);
-
-            return $this->cloudinary->image($publicId)
-                ->addTransformation($finalTransformations)
-                ->toUrl();
-        } catch (Exception $e) {
-            Log::error('Failed to generate optimized URL: ' . $e->getMessage());
-            return null;
-        }
-    }
-
-    public function getThumbnailUrl($publicId, $width = 150, $height = 150)
-    {
-        return $this->getOptimizedUrl($publicId, [
-            'width' => $width,
-            'height' => $height,
-            'crop' => 'fill',
-            'gravity' => 'auto',
-        ]);
-    }
-
-    public function isAvailable()
-    {
-        try {
-            $this->adminApi->ping();
-            return true;
-        } catch (Exception $e) {
-            Log::warning('Cloudinary service unavailable: ' . $e->getMessage());
-            return false;
-        }
-    }
-
-    public function getUploadPreset()
-    {
-        return env('CLOUDINARY_UPLOAD_PRESET', 'ml_default');
-    }
-
-    public function validateImage($file)
-    {
-        $errors = [];
-
-        if ($file->getSize() > 5 * 1024 * 1024) {
-            $errors[] = 'File size must be less than 5MB';
-        }
-
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (!in_array($file->getMimeType(), $allowedTypes)) {
-            $errors[] = 'File must be a valid image (JPEG, PNG, GIF, WebP)';
-        }
-
-        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-        $extension = strtolower($file->getClientOriginalExtension());
-        if (!in_array($extension, $allowedExtensions)) {
-            $errors[] = 'File extension must be jpg, jpeg, png, gif, or webp';
+            $validFiles[] = $file;
         }
 
         return [
             'valid' => empty($errors),
-            'errors' => $errors,
+            'valid_files' => $validFiles,
+            'errors' => $errors
         ];
     }
 
-    public function validateMultipleImages($files)
+    /**
+     * Upload multiple images (mock implementation)
+     */
+    public function uploadMultipleImages(array $files, string $folder = 'expenses'): array
     {
-        $allErrors = [];
-        $validFiles = [];
+        $results = [];
+        $errors = [];
 
-        foreach ($files as $index => $file) {
-            $validation = $this->validateImage($file);
-
-            if ($validation['valid']) {
-                $validFiles[] = $file;
-            } else {
-                foreach ($validation['errors'] as $error) {
-                    $allErrors[] = "File " . ($index + 1) . ": " . $error;
-                }
+        foreach ($files as $file) {
+            try {
+                // Mock upload result
+                $publicId = 'mock_' . uniqid() . '_' . time();
+                $results[] = [
+                    'public_id' => $publicId,
+                    'secure_url' => 'https://via.placeholder.com/400x300?text=Mock+Image',
+                    'url' => 'https://via.placeholder.com/400x300?text=Mock+Image',
+                    'format' => 'jpg',
+                    'width' => 400,
+                    'height' => 300,
+                    'bytes' => $file->getSize(),
+                    'original_filename' => $file->getClientOriginalName()
+                ];
+            } catch (\Exception $e) {
+                $errors[] = "Failed to upload {$file->getClientOriginalName()}: " . $e->getMessage();
             }
         }
 
         return [
-            'valid' => empty($allErrors),
-            'errors' => $allErrors,
-            'valid_files' => $validFiles,
-            'valid_count' => count($validFiles),
-            'total_count' => count($files),
+            'success' => empty($errors),
+            'results' => $results,
+            'errors' => $errors
+        ];
+    }
+
+    /**
+     * Delete multiple images (mock implementation)
+     */
+    public function deleteMultipleImages(array $publicIds): array
+    {
+        $errors = [];
+
+        foreach ($publicIds as $publicId) {
+            try {
+                // Mock deletion - just log it
+                Log::info("Mock deletion of image: {$publicId}");
+            } catch (\Exception $e) {
+                $errors[] = "Failed to delete {$publicId}: " . $e->getMessage();
+            }
+        }
+
+        return [
+            'success' => empty($errors),
+            'errors' => $errors
         ];
     }
 }
+

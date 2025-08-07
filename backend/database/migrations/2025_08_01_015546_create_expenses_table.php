@@ -13,20 +13,19 @@ return new class extends Migration
     {
         Schema::create('expenses', function (Blueprint $table) {
             $table->id();
-            $table->date('expense_date')->nullable();
+            $table->date('date')->default(now());
             $table->string('or_si_no');
             $table->text('description');
-            $table->string('location')->nullable();
-            $table->string('store')->nullable();
-            $table->integer('quantity')->nullable();
-            $table->string('unit')->nullable();
-            $table->string('size_dimension')->nullable();
-            $table->decimal('unit_price', 10, 2)->nullable();
+            $table->string('location');
+            $table->string('store');
+            $table->string('quantity'); // Changed from integer to string
+            $table->string('size_dimension');
+            $table->decimal('unit_price', 10, 2);
             $table->decimal('total_price', 10, 2);
+            $table->string('mop'); // Mode of payment
+            $table->text('mop_description')->nullable(); // MOP description
             $table->string('category');
-            $table->json('images')->nullable(); // Store array of image data
-            $table->string('mop_type')->nullable(); // PDC, PO, CARD
-            $table->string('mop_details')->nullable(); // Additional MOP details
+            $table->json('images')->nullable(); // Store multiple image paths as JSON
             $table->timestamps();
         });
     }

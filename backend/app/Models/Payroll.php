@@ -30,6 +30,7 @@ class Payroll extends Model
         'daily_attendance', // Added
         'daily_overtime',   // Added
         'daily_late',       // Added
+        'daily_site_address', // Added
         'basic_salary',
         'overtime_pay',
         'late_deduction',
@@ -55,7 +56,8 @@ class Payroll extends Model
         'late_minutes' => 'decimal:2',
         'daily_attendance' => 'array',
         'daily_overtime' => 'array',   
-        'daily_late' => 'array',      
+        'daily_late' => 'array',
+        'daily_site_address' => 'array',
         'basic_salary' => 'decimal:2',
         'overtime_pay' => 'decimal:2',
         'late_deduction' => 'decimal:2',

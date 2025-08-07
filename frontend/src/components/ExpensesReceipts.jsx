@@ -18,14 +18,101 @@ import {
   ChevronDown,
   Loader2,
   Upload,
-  Image as ImageIcon,
   ZoomIn,
-  Camera
+  ArrowLeft,
+  ArrowRight
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import * as XLSX from 'xlsx'
-import API_BASE_URL from './Config'
+import API_BASE_URL from './Config' // Assuming API_BASE_URL is defined elsewhere or directly used
+
+// const API_BASE_URL = 'http://localhost:8000/api' // Directly defining API_BASE_URL here
+
+// Image Gallery Modal Component
+function ImageGalleryModal({ isOpen, onClose, images, initialIndex = 0 }) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex)
+
+  useEffect(() => {
+    setCurrentIndex(initialIndex)
+  }, [initialIndex, isOpen])
+
+  const nextImage = () => {
+    setCurrentIndex((prev) => (prev + 1) % images.length)
+  }
+
+  const prevImage = () => {
+    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length)
+  }
+
+  if (!isOpen || !images || images.length === 0) return null
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Close Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="absolute top-4 right-4 z-10 text-white hover:bg-white/20"
+          >
+            <X className="h-6 w-6" />
+          </Button>
+
+          {/* Navigation Arrows */}
+          {images.length > 1 && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={prevImage}
+                className="absolute left-4 z-10 text-white bg-black/50 hover:bg-white/20"
+              >
+                <ArrowLeft className="h-6 w-6" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={nextImage}
+                className="absolute right-4 z-10 text-white bg-black/50 hover:bg-white/20"
+              >
+                <ArrowRight className="h-6 w-6" />
+              </Button>
+            </>
+          )}
+
+          {/* Image */}
+          <img
+            src={`${API_BASE_URL.replace('/api', '')}/storage/${images[currentIndex]}`}
+            alt={`Image ${currentIndex + 1}`}
+            className="max-w-full max-h-full object-contain"
+          />
+
+          {/* Image Counter */}
+          {images.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+              {currentIndex + 1} / {images.length}
+            </div>
+          )}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
 
 // Custom Dropdown Component
 function CustomDropdown({ options, value, onChange, placeholder, className = "", disabled = false }) {
@@ -41,7 +128,7 @@ function CustomDropdown({ options, value, onChange, placeholder, className = "",
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside, false)
+      document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [])
 
@@ -115,250 +202,141 @@ function CustomDropdown({ options, value, onChange, placeholder, className = "",
   )
 }
 
-// Image Modal Component for viewing/zooming images
-function ImageModal({ isOpen, onClose, images, currentIndex, onNavigate }) {
-  if (!isOpen || !images || images.length === 0) return null
-
-  const currentImage = images[currentIndex] || images[0]
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.8 }}
-          transition={{ duration: 0.3 }}
-          className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Close button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="absolute top-4 right-4 z-10 bg-black/50 text-white hover:bg-black/70"
-          >
-            <X className="h-5 w-5" />
-          </Button>
-
-          {/* Navigation buttons */}
-          {images.length > 1 && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onNavigate('prev')}
-                className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 bg-black/50 text-white hover:bg-black/70"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onNavigate('next')}
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-black/50 text-white hover:bg-black/70"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
-            </>
-          )}
-
-          {/* Image */}
-          <img
-            src={currentImage.secure_url || currentImage.url}
-            alt="Expense receipt"
-            className="max-w-full max-h-full object-contain rounded-lg"
-            onError={(e) => {
-              console.error('Image failed to load:', currentImage)
-              e.target.style.display = 'none'
-            }}
-          />
-
-          {/* Image counter */}
-          {images.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
-              {currentIndex + 1} of {images.length}
-            </div>
-          )}
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  )
-}
-
 // Expense Modal Component (for Add and Edit)
 function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
   const [formData, setFormData] = useState(initialData || {
-    expenseDate: '',
+    date: new Date().toISOString().split('T')[0],
     orSiNo: '',
     description: '',
     quantity: '',
     sizeDimension: '',
     unitPrice: '',
     totalPrice: '',
+    mop: '',
+    mopDescription: '',
     category: 'Plumbing',
-    customCategory: '',
     location: '',
     store: '',
-    mopType: '',
-    mopDetails: '',
     images: []
   })
 
   const [selectedImages, setSelectedImages] = useState([])
-  const [imagePreview, setImagePreview] = useState([])
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
-    setFormData(initialData || {
-      expenseDate: '',
-      orSiNo: '',
-      description: '',
-      quantity: '',
-      sizeDimension: '',
-      unitPrice: '',
-      totalPrice: '',
-      category: 'Plumbing',
-      customCategory: '',
-      location: '',
-      store: '',
-      mopType: '',
-      mopDetails: '',
-      images: []
-    })
-    
-    // Reset image states when modal opens/closes
-    if (!isOpen) {
-      setSelectedImages([])
-      setImagePreview([])
-      setIsSubmitting(false)
-    } else if (initialData && initialData.images) {
-      setImagePreview(initialData.images)
+    if (initialData) {
+      setFormData({
+        date: initialData.date || new Date().toISOString().split('T')[0],
+        orSiNo: initialData.or_si_no || '',
+        description: initialData.description || '',
+        quantity: initialData.quantity || '',
+        sizeDimension: initialData.size_dimension || '',
+        unitPrice: initialData.unit_price || '',
+        totalPrice: initialData.total_price || '',
+        mop: initialData.mop || 'PDC',
+        mopDescription: initialData.mop_description || '',
+        category: initialData.category || 'Plumbing',
+        location: initialData.location || '',
+        store: initialData.store || '',
+        images: initialData.images || []
+      })
+    } else {
+      setFormData({
+        date: new Date().toISOString().split('T')[0],
+        orSiNo: '',
+        description: '',
+        quantity: '',
+        sizeDimension: '',
+        unitPrice: '',
+        totalPrice: '',
+        mop: '',
+        mopDescription: '',
+        category: 'Plumbing',
+        location: '',
+        store: '',
+        images: []
+      })
     }
-  }, [initialData, isOpen])
-
-  // Auto-calculate total price when unit price changes
-  useEffect(() => {
-    if (formData.unitPrice !== '') {
-      const unitPrice = parseFloat(formData.unitPrice)
-      // Quantity can be a string, so we don't use it for auto-calculation here
-      // If quantity is not a number, assume 1 for calculation if unitPrice is present
-      const quantityVal = parseFloat(formData.quantity) || 1;
-      const total = unitPrice * quantityVal;
-      setFormData(prev => ({ ...prev, totalPrice: total.toFixed(2) }))
-    } else if (formData.unitPrice === '') {
-      // If unit price is cleared, clear total price
-      setFormData(prev => ({ ...prev, totalPrice: '' }));
-    }
-  }, [formData.unitPrice])
+    setSelectedImages([])
+  }, [initialData])
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value }
+      
+      // Auto-calculate total price when unit price changes
+      if (field === 'unitPrice' && prev.quantity) {
+        const quantity = parseFloat(prev.quantity.replace(/[^\d.]/g, '')) || 0
+        const unitPrice = parseFloat(value) || 0
+        newData.totalPrice = (quantity * unitPrice).toFixed(2)
+      }
+      
+      return newData
+    })
   }
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files)
-    if (files.length === 0) return
-
-    // Limit to 10 images total
-    const totalImages = selectedImages.length + files.length
-    if (totalImages > 10) {
+    if (files.length + selectedImages.length > 10) {
       alert('Maximum 10 images allowed')
       return
     }
-
     setSelectedImages(prev => [...prev, ...files])
-
-    // Create preview URLs
-    files.forEach(file => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setImagePreview(prev => [...prev, {
-          url: e.target.result,
-          file: file,
-          isNew: true
-        }])
-      }
-      reader.readAsDataURL(file)
-    })
   }
 
   const removeImage = (index) => {
-    const imageToRemove = imagePreview[index]
-    
-    if (imageToRemove.isNew) {
-      // Remove from selected images
-      const fileIndex = selectedImages.findIndex(file => file.name === imageToRemove.file.name)
-      if (fileIndex > -1) {
-        setSelectedImages(prev => prev.filter((_, i) => i !== fileIndex))
-      }
-    }
-    
-    setImagePreview(prev => prev.filter((_, i) => i !== index))
+    setSelectedImages(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault()
     
-    if (isSubmitting) return
-    setIsSubmitting(true)
-    
-    try {
-      const finalData = {
-        id: initialData ? initialData.id : null,
-        expense_date: formData.expenseDate || null,
-        or_si_no: formData.orSiNo,
-        description: formData.description,
-        quantity: formData.quantity || null, // Quantity can be string
-        size_dimension: formData.sizeDimension || null,
-        unit_price: formData.unitPrice ? parseFloat(formData.unitPrice) : null,
-        total_price: formData.totalPrice ? parseFloat(formData.totalPrice) : null, // Total price can be null if not set
-        category: formData.category === 'Others' ? formData.customCategory : formData.category,
-        location: formData.location || null,
-        store: formData.store || null,
-        mop_type: formData.mopType || null,
-        mop_details: formData.mopDetails || null,
-        images: selectedImages
-      }
-      
-      await onSubmit(finalData)
-      onClose()
-    } catch (error) {
-      console.error('Error submitting form:', error)
-    } finally {
-      setIsSubmitting(false)
+    // Validate required fields
+    if (!formData.description || !formData.totalPrice) {
+      alert('Description and Total Price are required fields')
+      return
     }
+    
+    const submitData = new FormData()
+    
+    // Add form data
+    if (formData.date) submitData.append('date', formData.date)
+    if (formData.orSiNo) submitData.append('or_si_no', formData.orSiNo)
+    submitData.append('description', formData.description)
+    if (formData.quantity) submitData.append('quantity', formData.quantity)
+    if (formData.sizeDimension) submitData.append('size_dimension', formData.sizeDimension)
+    if (formData.unitPrice) submitData.append('unit_price', formData.unitPrice)
+    submitData.append('total_price', formData.totalPrice)
+    if (formData.mop) submitData.append('mop', formData.mop)
+    if (formData.mopDescription) submitData.append('mop_description', formData.mopDescription)
+    if (formData.category) submitData.append('category', formData.category)
+    if (formData.location) submitData.append('location', formData.location)
+    if (formData.store) submitData.append('store', formData.store)
+    
+    // Add images
+    selectedImages.forEach((image, index) => {
+      submitData.append(`images[${index}]`, image)
+    })
+    
+    if (initialData) {
+      submitData.append('_method', 'PUT')
+    }
+    
+    onSubmit(submitData, initialData?.id)
+    onClose()
   }
 
   // Prepare dropdown options
-  const categoryOptions = [
-    { value: 'Plumbing', label: 'Plumbing' },
-    { value: 'Electrical', label: 'Electrical' },
-    { value: 'Safety', label: 'Safety' },
-    { value: 'Structural/Painting', label: 'Structural/Painting' },
-    { value: 'Architectural', label: 'Architectural' },
-    { value: 'Sanitary', label: 'Sanitary' },
-    { value: 'Painting', label: 'Painting' },
-    { value: 'Others', label: 'Others (Please specify)' }
-  ]
-
   const mopOptions = [
-    { value: '', label: 'Select MOP (Optional)' },
     { value: 'PDC', label: 'PDC' },
     { value: 'PO', label: 'PO' },
     { value: 'CARD', label: 'CARD' }
   ]
+
+  const categoryOptions = categories.filter(cat => cat !== 'All').map(category => ({
+    value: category,
+    label: category
+  }))
 
   if (!isOpen) return null
 
@@ -376,7 +354,7 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ duration: 0.3 }}
-          className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="p-6">
@@ -388,23 +366,19 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                disabled={isSubmitting}
                 className="text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
               >
                 <X className="h-5 w-5" />
               </Button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Image Upload Section */}
-              <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-6">
-                <div className="text-center">
-                  <Camera className="h-12 w-12 text-[var(--color-foreground)]/50 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-[var(--color-foreground)] mb-2">Upload Receipt Images</h3>
-                  <p className="text-sm text-[var(--color-foreground)]/70 mb-4">
-                    Upload up to 10 images. First image will be displayed as primary.
-                  </p>
-                  
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Images Upload Section */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
+                  Images (Max 10)
+                </label>
+                <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-4">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -412,59 +386,40 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
                     accept="image/*"
                     onChange={handleImageUpload}
                     className="hidden"
-                    disabled={isSubmitting}
                   />
-                  
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => fileInputRef.current?.click()}
-                    className="mb-4"
-                    disabled={isSubmitting}
+                    className="w-full border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
                   >
                     <Upload className="h-4 w-4 mr-2" />
-                    Choose Images
+                    Upload Images
                   </Button>
-                </div>
-
-                {/* Image Preview */}
-                {imagePreview.length > 0 && (
-                  <div className="mt-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {imagePreview.map((image, index) => (
-                        <div key={index} className="relative group">
+                  
+                  {selectedImages.length > 0 && (
+                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {selectedImages.map((image, index) => (
+                        <div key={index} className="relative">
                           <img
-                            src={image.url || image.secure_url}
+                            src={URL.createObjectURL(image)}
                             alt={`Preview ${index + 1}`}
-                            className="w-full h-24 object-cover rounded-lg border border-[var(--color-border)]"
-                            onError={(e) => {
-                              console.error('Preview image failed to load:', image)
-                              e.target.style.display = 'none'
-                            }}
+                            className="w-full h-20 object-cover rounded"
                           />
-                          {index === 0 && (
-                            <div className="absolute top-1 left-1 bg-[var(--color-primary)] text-white text-xs px-2 py-1 rounded">
-                              Primary
-                            </div>
-                          )}
-                          {index > 0 && imagePreview.length > 1 && (
-                            <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
-                              +{imagePreview.length - 1}
-                            </div>
-                          )}
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => removeImage(index)}
-                            disabled={isSubmitting}
-                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white hover:bg-red-600"
                           >
                             <X className="h-3 w-3" />
-                          </button>
+                          </Button>
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -475,24 +430,21 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
                   </label>
                   <input
                     type="date"
-                    value={formData.expenseDate}
-                    onChange={(e) => handleInputChange('expenseDate', e.target.value)}
-                    disabled={isSubmitting}
+                    value={formData.date}
+                    onChange={(e) => handleInputChange('date', e.target.value)}
                     className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
                   />
                 </div>
 
-                {/* DR/SI No. */}
+                {/* DR/SI */}
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                    DR/SI No. *
+                    DR/SI
                   </label>
                   <input
                     type="text"
-                    required
                     value={formData.orSiNo}
                     onChange={(e) => handleInputChange('orSiNo', e.target.value)}
-                    disabled={isSubmitting}
                     className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
                     placeholder="e.g., DR-001, SI-002"
                   />
@@ -502,32 +454,29 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                  Description *
+                  Description (Name of the item bought) *
                 </label>
-                <textarea
+                <input
                   required
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
-                  disabled={isSubmitting}
                   className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
                   placeholder="Detailed description of the expense"
-                  rows="3"
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Quantity */}
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
                     Quantity
                   </label>
                   <input
-                    type="text" // Changed to text
+                    type="text"
                     value={formData.quantity}
                     onChange={(e) => handleInputChange('quantity', e.target.value)}
-                    disabled={isSubmitting}
                     className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                    placeholder="e.g., 1 gallon, 2 pcs"
+                    placeholder="e.g., 1 gallon, 1 pc, 1 pack"
                   />
                 </div>
 
@@ -542,16 +491,17 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
                     step="0.01"
                     value={formData.unitPrice}
                     onChange={(e) => handleInputChange('unitPrice', e.target.value)}
-                    disabled={isSubmitting}
                     className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
                     placeholder="0.00"
                   />
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Total Price */}
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                    Total Price (₱) *
+                    Total (₱) *
                   </label>
                   <input
                     type="number"
@@ -560,9 +510,50 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
                     step="0.01"
                     value={formData.totalPrice}
                     onChange={(e) => handleInputChange('totalPrice', e.target.value)}
-                    disabled={isSubmitting}
                     className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
                     placeholder="0.00"
+                  />
+                </div>
+
+                {/* Category */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
+                    Category
+                  </label>
+                  <CustomDropdown
+                    options={categoryOptions}
+                    value={formData.category}
+                    onChange={(value) => handleInputChange('category', value)}
+                    placeholder="Select category"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* MOP */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
+                    MOP (Mode of Payment)
+                  </label>
+                  <CustomDropdown
+                    options={mopOptions}
+                    value={formData.mop}
+                    onChange={(value) => handleInputChange('mop', value)}
+                    placeholder="Select MOP"
+                  />
+                </div>
+
+                {/* MOP Description */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
+                    MOP Description
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.mopDescription}
+                    onChange={(e) => handleInputChange('mopDescription', e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                    placeholder="e.g., 22311 Bxlsk"
                   />
                 </div>
               </div>
@@ -577,7 +568,6 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
                     type="text"
                     value={formData.sizeDimension}
                     onChange={(e) => handleInputChange('sizeDimension', e.target.value)}
-                    disabled={isSubmitting}
                     className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
                     placeholder="e.g., Standard, 50kg, Medium"
                   />
@@ -592,86 +582,24 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
                     type="text"
                     value={formData.location}
                     onChange={(e) => handleInputChange('location', e.target.value)}
-                    disabled={isSubmitting}
                     className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
                     placeholder="e.g., Warehouse A, Site B"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Store */}
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                    Store
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.store}
-                    onChange={(e) => handleInputChange('store', e.target.value)}
-                    disabled={isSubmitting}
-                    className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                    placeholder="e.g., Main Store, Online Shop"
-                  />
-                </div>
-
-                {/* Category */}
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                    Category *
-                  </label>
-                  <CustomDropdown
-                    options={categoryOptions}
-                    value={formData.category}
-                    onChange={(value) => handleInputChange('category', value)}
-                    placeholder="Select category"
-                    disabled={isSubmitting}
-                  />
-                  {formData.category === 'Others' && (
-                    <input
-                      type="text"
-                      required
-                      value={formData.customCategory}
-                      onChange={(e) => handleInputChange('customCategory', e.target.value)}
-                      disabled={isSubmitting}
-                      className="w-full px-3 py-2 mt-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                      placeholder="Specify category"
-                    />
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* MOP Type */}
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                    MOP
-                  </label>
-                  <CustomDropdown
-                    options={mopOptions}
-                    value={formData.mopType}
-                    onChange={(value) => handleInputChange('mopType', value)}
-                    placeholder="Select MOP (Optional)"
-                    disabled={isSubmitting}
-                  />
-                </div>
-
-                {/* MOP Details */}
-                {formData.mopType && (
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                      {formData.mopType} Details
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.mopDetails}
-                      onChange={(e) => handleInputChange('mopDetails', e.target.value)}
-                      disabled={isSubmitting}
-                      className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                      placeholder={`Enter ${formData.mopType} details`}
-                    />
-                  </div>
-                )}
+              {/* Store */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
+                  Store
+                </label>
+                <input
+                  type="text"
+                  value={formData.store}
+                  onChange={(e) => handleInputChange('store', e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                  placeholder="e.g., Main Store, Online Shop"
+                />
               </div>
 
               {/* Form Actions */}
@@ -680,24 +608,15 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
                   type="button"
                   variant="outline"
                   onClick={onClose}
-                  disabled={isSubmitting}
-                  className="text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
+                  className="border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
                   className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] hover:from-[var(--color-secondary)] hover:to-[var(--color-primary)] text-white"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      {initialData ? 'Updating...' : 'Adding...'}
-                    </>
-                  ) : (
-                    initialData ? 'Update Expense' : 'Add Expense'
-                  )}
+                  {initialData ? 'Update Expense' : 'Add Expense'}
                 </Button>
               </div>
             </form>
@@ -751,7 +670,7 @@ const DeleteConfirmationModal = React.memo(({ isOpen, onClose, onConfirm, isDele
 
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="font-semibold text-gray-900 mb-1 truncate" title={expense.description}>{expense.description}</h3>
-                <p className="text-sm text-gray-600">DR/SI No: {expense.or_si_no}</p>
+                <p className="text-sm text-gray-600">OR/SI No: {expense.or_si_no}</p>
                 <p className="text-sm text-gray-600">Total: ₱{parseFloat(expense.total_price).toFixed(2)}</p>
               </div>
             </div>
@@ -867,7 +786,6 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
 }
 
 const categories = ['All', 'Plumbing', 'Electrical', 'Safety', 'Structural/Painting', 'Architectural', 'Sanitary', 'Painting', 'Others']
-const mopTypes = ['All', 'PDC', 'PO', 'CARD']
 
 function ExpensesReceipts() {
   const [expenses, setExpenses] = useState([])
@@ -879,12 +797,10 @@ function ExpensesReceipts() {
   const [editingExpense, setEditingExpense] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [expandedRows, setExpandedRows] = useState(new Set())
+  const [imageGalleryOpen, setImageGalleryOpen] = useState(false)
+  const [galleryImages, setGalleryImages] = useState([])
+  const [galleryInitialIndex, setGalleryInitialIndex] = useState(0)
   const itemsPerPage = 10
-
-  // Image modal states
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false)
-  const [viewingImages, setViewingImages] = useState([])
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   const [modals, setModals] = useState({
     delete: { isOpen: false, isDeleting: false, expense: null }
@@ -931,100 +847,36 @@ function ExpensesReceipts() {
     }
   }, [showAlert])
 
-  // Handle add expense
-  const handleAddExpense = async (formData) => {
+  // Add or Update expense
+  const handleSaveExpense = useCallback(async (expenseData, expenseId = null) => {
     try {
-      const submitData = new FormData()
-      
-      // Append all form fields
-      Object.keys(formData).forEach(key => {
-        if (key === 'images') {
-          formData.images.forEach((image, index) => {
-            submitData.append(`images[${index}]`, image)
-          })
-        } else if (formData[key] !== null && formData[key] !== '') {
-          submitData.append(key, formData[key])
-        }
-      })
+      let response
+      const url = expenseId ? `${API_BASE_URL}/expenses/${expenseId}` : `${API_BASE_URL}/expenses`
+      const method = 'POST' // Laravel handles PUT via _method field
 
-      const response = await fetch(`${API_BASE_URL}/expenses`, {
-        method: 'POST',
-        body: submitData
+      response = await fetch(url, {
+        method: method,
+        body: expenseData // FormData for file uploads
       })
       
       const data = await response.json()
       
       if (data.success) {
         fetchExpenses()
-        setShowExpenseModal(false)
-        showAlert('Expense added successfully!', 'success')
+        const message = expenseId ? 'Expense updated successfully!' : 'Expense added successfully!'
+        showAlert(message, 'success')
       } else {
-        console.error('Failed to add expense:', data.message)
-        showAlert('Failed to add expense: ' + (data.message || 'Unknown error'), 'error')
+        const errorMsg = data.errors ? Object.values(data.errors).flat().join(', ') : data.message
+        showAlert('Error: ' + errorMsg, 'error')
       }
-    } catch (error) {
-      console.error('Error adding expense:', error)
-      showAlert('Error adding expense: ' + error.message, 'error')
+    } catch (err) {
+      showAlert(`Failed to ${expenseId ? 'update' : 'add'} expense: ` + err.message, 'error')
     }
-  }
-
-  // Handle edit expense
-  const handleEditExpense = async (formData) => {
-    try {
-      const submitData = new FormData()
-      
-      // Append all form fields
-      Object.keys(formData).forEach(key => {
-        if (key === 'images') {
-          formData.images.forEach((image, index) => {
-            submitData.append(`images[${index}]`, image)
-          })
-        } else if (formData[key] !== null && formData[key] !== '') {
-          submitData.append(key, formData[key])
-        }
-      })
-
-      const response = await fetch(`${API_BASE_URL}/expenses/${formData.id}`, {
-        method: 'POST', // Laravel expects POST with _method=PUT for file uploads
-        body: submitData
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        fetchExpenses()
-        setShowExpenseModal(false)
-        setEditingExpense(null)
-        showAlert('Expense updated successfully!', 'success')
-      } else {
-        console.error('Failed to update expense:', data.message)
-        showAlert('Failed to update expense: ' + (data.message || 'Unknown error'), 'error')
-      }
-    } catch (error) {
-      console.error('Error updating expense:', error)
-      showAlert('Error updating expense: ' + error.message, 'error')
-    }
-  }
+  }, [fetchExpenses, showAlert])
 
   // Handle edit button click
   const handleEditClick = useCallback((expense) => {
-    setEditingExpense({
-      id: expense.id,
-      expenseDate: expense.expense_date || '',
-      orSiNo: expense.or_si_no,
-      description: expense.description,
-      quantity: expense.quantity || '',
-      sizeDimension: expense.size_dimension || '',
-      unitPrice: expense.unit_price || '',
-      totalPrice: expense.total_price,
-      category: expense.category,
-      customCategory: categories.includes(expense.category) ? '' : expense.category,
-      location: expense.location || '',
-      store: expense.store || '',
-      mopType: expense.mop_type || '',
-      mopDetails: expense.mop_details || '',
-      images: expense.images || []
-    })
+    setEditingExpense(expense)
     setShowExpenseModal(true)
   }, [])
 
@@ -1078,37 +930,32 @@ function ExpensesReceipts() {
     })
   }, [])
 
-  // Handle image viewing
-  const handleViewImages = (images, startIndex = 0) => {
-    if (!images || images.length === 0) return
-    setViewingImages(images)
-    setCurrentImageIndex(startIndex)
-    setIsImageModalOpen(true)
-  }
-
-  const handleImageNavigation = (direction) => {
-    if (direction === 'next') {
-      setCurrentImageIndex(prev => (prev + 1) % viewingImages.length)
-    } else {
-      setCurrentImageIndex(prev => (prev - 1 + viewingImages.length) % viewingImages.length)
-    }
-  }
+  // Handle image click
+  const handleImageClick = useCallback((images, initialIndex) => {
+    setGalleryImages(images)
+    setGalleryInitialIndex(initialIndex)
+    setImageGalleryOpen(true)
+  }, [])
 
   // Load expenses on component mount
   useEffect(() => {
     fetchExpenses()
   }, [fetchExpenses])
 
+  // Get unique MOPs for filter
+  const mops = useMemo(() => {
+    const uniqueMops = [...new Set(expenses.map(expense => expense.mop))]
+    return ['All', ...uniqueMops]
+  }, [expenses])
+
   // Filter and search logic
   const filteredExpenses = useMemo(() => {
     return expenses.filter(expense => {
       const matchesSearch = expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           expense.or_si_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           (expense.store && expense.store.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                           (expense.location && expense.location.toLowerCase().includes(searchTerm.toLowerCase()))
+                           expense.or_si_no.toLowerCase().includes(searchTerm.toLowerCase())
       
       const matchesCategory = selectedCategory === 'All' || expense.category === selectedCategory
-      const matchesMop = selectedMop === 'All' || expense.mop_type === selectedMop
+      const matchesMop = selectedMop === 'All' || expense.mop === selectedMop
       
       return matchesSearch && matchesCategory && matchesMop
     })
@@ -1126,22 +973,23 @@ function ExpensesReceipts() {
 
   // Calculate totals
   const totalAmount = filteredExpenses.reduce((sum, expense) => sum + parseFloat(expense.total_price), 0)
-  const totalItems = filteredExpenses.reduce((sum, expense) => sum + (expense.quantity ? (parseFloat(expense.quantity) || 0) : 0), 0)
+  const totalItems = filteredExpenses.length
 
   // Export to Excel
   const exportToExcel = () => {
     const exportData = filteredExpenses.map(expense => ({
-      'Date': expense.expense_date ? new Date(expense.expense_date).toLocaleDateString() : 'N/A',
-      'DR/SI No.': expense.or_si_no.replace(/^(OR|or)/i, 'DR').replace(/^(SI|si)/i, 'SI'),
+      'Date': new Date(expense.date).toLocaleDateString(),
+      'DR/SI No.': expense.or_si_no,
       'Description': expense.description,
-      'Quantity': expense.quantity || 'N/A',
-      'Unit Price': expense.unit_price ? `₱${parseFloat(expense.unit_price).toFixed(2)}` : 'N/A',
-      'Total Price': `₱${parseFloat(expense.total_price).toFixed(2)}`,
-      'MOP': expense.mop_type ? `${expense.mop_type}${expense.mop_details ? ` - ${expense.mop_details}` : ''}` : 'N/A',
+      'Quantity': expense.quantity,
+      'Unit Price': expense.unit_price,
+      'Total Price': expense.total_price,
+      'MOP': expense.mop + (expense.mop_description ? ` - ${expense.mop_description}` : ''),
       'Category': expense.category,
-      'Location': expense.location || 'N/A',
-      'Store': expense.store || 'N/A',
-      'Size/Dimension': expense.size_dimension || 'N/A',
+      'Size/Dimension': expense.size_dimension,
+      'Location': expense.location,
+      'Store': expense.store,
+      'Date Created': new Date(expense.created_at).toLocaleDateString()
     }))
 
     const ws = XLSX.utils.json_to_sheet(exportData)
@@ -1156,10 +1004,24 @@ function ExpensesReceipts() {
     label: category === 'All' ? 'All Categories' : category
   }))
 
-  const mopFilterOptions = mopTypes.map(mop => ({
+  // Prepare MOP options for filter dropdown
+  const mopFilterOptions = mops.map(mop => ({
     value: mop,
-    label: mop === 'All' ? 'All MOP' : mop
+    label: mop === 'All' ? 'All MOPs' : mop
   }))
+
+  // Format MOP display
+  const formatMOP = (mop, mopDescription) => {
+    return mopDescription ? `${mop} - ${mopDescription}` : mop
+  }
+
+  // Get first image for display
+  const getFirstImage = (expense) => {
+    if (expense.images && expense.images.length > 0) {
+      return expense.images[0]
+    }
+    return null
+  }
 
   if (loading) {
     return (
@@ -1282,7 +1144,7 @@ function ExpensesReceipts() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-foreground)]/50 h-4 w-4" />
           <input
             type="text"
-            placeholder="Search by description, DR/SI number..."
+            placeholder="Search by description, OR/SI number..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
@@ -1300,7 +1162,7 @@ function ExpensesReceipts() {
             options={mopFilterOptions}
             value={selectedMop}
             onChange={setSelectedMop}
-            placeholder="All MOP"
+            placeholder="All MOPs"
             className="w-32"
           />
           <Button
@@ -1331,11 +1193,11 @@ function ExpensesReceipts() {
                 <tr className="border-b border-[var(--color-border)]">
                   <th className="text-left py-3 px-4 font-medium text-[var(--color-foreground)]/70">Image</th>
                   <th className="text-left py-3 px-4 font-medium text-[var(--color-foreground)]/70">Date</th>
-                  <th className="text-left py-3 px-4 font-medium text-[var(--color-foreground)]/70">DR/SI No.</th>
+                  <th className="text-left py-3 px-4 font-medium text-[var(--color-foreground)]/70">DR/SI</th>
                   <th className="text-left py-3 px-4 font-medium text-[var(--color-foreground)]/70">Description</th>
                   <th className="text-left py-3 px-4 font-medium text-[var(--color-foreground)]/70">Quantity</th>
                   <th className="text-left py-3 px-4 font-medium text-[var(--color-foreground)]/70">Unit Price</th>
-                  <th className="text-left py-3 px-4 font-medium text-[var(--color-foreground)]/70">Total Price</th>
+                  <th className="text-left py-3 px-4 font-medium text-[var(--color-foreground)]/70">Total</th>
                   <th className="text-left py-3 px-4 font-medium text-[var(--color-foreground)]/70">MOP</th>
                   <th className="text-left py-3 px-4 font-medium text-[var(--color-foreground)]/70">Category</th>
                   <th className="text-left py-3 px-4 font-medium text-[var(--color-foreground)]/70">Actions</th>
@@ -1345,6 +1207,7 @@ function ExpensesReceipts() {
                 <AnimatePresence>
                   {paginatedExpenses.map((expense) => (
                     <React.Fragment key={expense.id}>
+                      {/* Main Row */}
                       <motion.tr
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -1353,70 +1216,60 @@ function ExpensesReceipts() {
                         className="border-b border-[var(--color-border)] hover:bg-gray-200 transition-colors cursor-pointer"
                         onClick={() => toggleRowExpansion(expense.id)}
                       >
-                        <td className="py-3 px-4">
-                          <div className="flex items-center space-x-3">
+                        <td className="py-3 px-4 text-[var(--color-foreground)]">
+                          <div className="flex items-center space-x-2">
                             <motion.div
                               animate={{ rotate: expandedRows.has(expense.id) ? 90 : 0 }}
                               transition={{ duration: 0.2 }}
                             >
-                              <ChevronRight className="h-4 w-4 text-[var(--color-foreground)]/70" />
+                              <ChevronRight className="h-4 w-4 text-[var(--color-foreground)]/50" />
                             </motion.div>
-                            {expense.images && expense.images.length > 0 ? (
+                            {getFirstImage(expense) ? (
                               <div className="relative">
                                 <img
-                                  src={expense.images[0].secure_url || expense.images[0].url}
-                                  alt="Receipt"
-                                  className="w-12 h-12 object-cover rounded-lg border border-[var(--color-border)] cursor-pointer"
+                                  src={`${API_BASE_URL.replace('/api', '')}/storage/${getFirstImage(expense)}`}
+                                  alt="Expense"
+                                  className="w-10 h-10 object-cover rounded cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handleViewImages(expense.images, 0)
-                                  }}
-                                  onError={(e) => {
-                                    console.error('Image failed to load:', expense.images[0])
-                                    e.target.style.display = 'none'
+                                    handleImageClick(expense.images, 0)
                                   }}
                                 />
-                                {expense.images.length > 1 && (
+                                {expense.images && expense.images.length > 1 && (
                                   <div className="absolute -top-1 -right-1 bg-[var(--color-primary)] text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                                    +{expense.images.length - 1}
+                                    {expense.images.length}
                                   </div>
                                 )}
                               </div>
                             ) : (
-                              <div className="w-12 h-12 bg-[var(--color-muted)] rounded-lg border border-[var(--color-border)] flex items-center justify-center">
-                                <ImageIcon className="h-6 w-6 text-[var(--color-foreground)]/50" />
+                              <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center">
+                                <Receipt className="h-5 w-5 text-gray-400" />
                               </div>
                             )}
                           </div>
                         </td>
                         <td className="py-3 px-4 text-[var(--color-foreground)]">
-                          {expense.expense_date ? new Date(expense.expense_date).toLocaleDateString() : 'N/A'}
+                          {new Date(expense.date).toLocaleDateString()}
                         </td>
-                        <td className="py-3 px-4 text-[var(--color-foreground)]">
-                          {expense.or_si_no.replace(/^(OR|or)/i, 'DR').replace(/^(SI|si)/i, 'SI')}
-                        </td>
+                        <td className="py-3 px-4 text-[var(--color-foreground)]">{expense.or_si_no}</td>
                         <td className="py-3 px-4 text-[var(--color-foreground)] max-w-xs">
                           <div className="truncate" title={expense.description}>
                             {expense.description}
                           </div>
                         </td>
+                        <td className="py-3 px-4 text-[var(--color-foreground)]">{expense.quantity}</td>
+                        <td className="py-3 px-4 text-[var(--color-foreground)]">₱{parseFloat(expense.unit_price).toFixed(2)}</td>
+                        <td className="py-3 px-4 text-[var(--color-foreground)] font-medium">₱{parseFloat(expense.total_price).toFixed(2)}</td>
                         <td className="py-3 px-4 text-[var(--color-foreground)]">
-                          {expense.quantity || 'N/A'}
+                          {formatMOP(expense.mop, expense.mop_description)}
                         </td>
                         <td className="py-3 px-4 text-[var(--color-foreground)]">
-                          {expense.unit_price ? `₱${parseFloat(expense.unit_price).toFixed(2)}` : 'N/A'}
-                        </td>
-                        <td className="py-3 px-4 text-[var(--color-foreground)] font-medium">
-                          ₱{parseFloat(expense.total_price).toFixed(2)}
-                        </td>
-                        <td className="py-3 px-4 text-[var(--color-foreground)]">
-                          {expense.mop_type ? `${expense.mop_type}${expense.mop_details ? ` - ${expense.mop_details}` : ''}` : 'N/A'}
-                        </td>
-                        <td className="py-3 px-4 text-[var(--color-foreground)]">
-                          {expense.category || 'N/A'}
+                          <span className="px-2 py-1 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-full text-xs">
+                            {expense.category}
+                          </span>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                             <Button
                               size="sm"
                               variant="ghost"
@@ -1429,7 +1282,7 @@ function ExpensesReceipts() {
                               size="sm"
                               variant="ghost"
                               onClick={() => openDeleteModal(expense)}
-                              className="text-red-500 hover:bg-red-50"
+                              className="text-red-500 hover:bg-red-500"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1437,28 +1290,28 @@ function ExpensesReceipts() {
                         </td>
                       </motion.tr>
 
-                      {/* Expanded Row Content - Only Size, Location, Store */}
+                      {/* Expanded Row */}
                       <AnimatePresence>
                         {expandedRows.has(expense.id) && (
                           <motion.tr
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.3 }}
+                            className="border-b border-[var(--color-border)] bg-[var(--color-muted)]/30"
                           >
-                            <td colSpan="10" className="px-6 py-4 bg-[var(--color-muted)]/30">
+                            <td colSpan="10" className="px-4 py-3">
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                                 <div>
-                                  <span className="font-medium text-[var(--color-foreground)]/70">Size/Dimension:</span>
-                                  <p className="text-[var(--color-foreground)]">{expense.size_dimension || 'N/A'}</p>
+                                  <span className="font-medium text-[var(--color-foreground)]">Size: </span>
+                                  <span className="text-[var(--color-foreground)]/70">{expense.size_dimension}</span>
                                 </div>
                                 <div>
-                                  <span className="font-medium text-[var(--color-foreground)]/70">Location:</span>
-                                  <p className="text-[var(--color-foreground)]">{expense.location || 'N/A'}</p>
+                                  <span className="font-medium text-[var(--color-foreground)]">Location: </span>
+                                  <span className="text-[var(--color-foreground)]/70">{expense.location}</span>
                                 </div>
                                 <div>
-                                  <span className="font-medium text-[var(--color-foreground)]/70">Store:</span>
-                                  <p className="text-[var(--color-foreground)]">{expense.store || 'N/A'}</p>
+                                  <span className="font-medium text-[var(--color-foreground)]">Store: </span>
+                                  <span className="text-[var(--color-foreground)]/70">{expense.store}</span>
                                 </div>
                               </div>
                             </td>
@@ -1470,35 +1323,32 @@ function ExpensesReceipts() {
                 </AnimatePresence>
               </tbody>
             </table>
-
-            {filteredExpenses.length === 0 && !loading && (
-              <div className="text-center py-12">
-                <Receipt className="h-12 w-12 text-[var(--color-foreground)]/50 mx-auto mb-4" />
-                <p className="text-[var(--color-foreground)]/70">No expenses found</p>
+            
+            {paginatedExpenses.length === 0 && (
+              <div className="text-center py-8 text-[var(--color-foreground)]/70">
+                No expenses found matching your criteria.
               </div>
             )}
           </div>
+
+          {/* Pagination */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
         </CardContent>
       </Card>
 
-      {/* Pagination */}
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-      />
-
-      {/* Modals */}
+      {/* Expense Modal (Add/Edit) */}
       <ExpenseModal
         isOpen={showExpenseModal}
-        onClose={() => {
-          setShowExpenseModal(false)
-          setEditingExpense(null)
-        }}
-        onSubmit={editingExpense ? handleEditExpense : handleAddExpense}
+        onClose={() => setShowExpenseModal(false)}
+        onSubmit={handleSaveExpense}
         initialData={editingExpense}
       />
 
+      {/* Confirmation Modal (Delete) */}
       <DeleteConfirmationModal
         isOpen={modals.delete.isOpen}
         onClose={closeDeleteModal}
@@ -1507,12 +1357,12 @@ function ExpensesReceipts() {
         expense={modals.delete.expense}
       />
 
-      <ImageModal
-        isOpen={isImageModalOpen}
-        onClose={() => setIsImageModalOpen(false)}
-        images={viewingImages}
-        currentIndex={currentImageIndex}
-        onNavigate={handleImageNavigation}
+      {/* Image Gallery Modal */}
+      <ImageGalleryModal
+        isOpen={imageGalleryOpen}
+        onClose={() => setImageGalleryOpen(false)}
+        images={galleryImages}
+        initialIndex={galleryInitialIndex}
       />
     </div>
   )

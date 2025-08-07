@@ -25,6 +25,7 @@ return new class extends Migration
             $table->integer("working_days");
             $table->decimal("overtime_hours", 8, 2);
             $table->decimal("late_minutes", 8, 2);
+            $table->json('daily_site_address')->nullable();
             $table->json("daily_attendance")->nullable();
             $table->json("daily_overtime")->nullable();
             $table->json("daily_late")->nullable();

@@ -68,7 +68,14 @@ class PayrollController extends Controller
             'daily_late.wednesday' => 'nullable|numeric|min:0',
             'daily_late.thursday' => 'nullable|numeric|min:0',
             'daily_late.friday' => 'nullable|numeric|min:0',
-            'daily_late.saturday' => 'nullable|numeric|min:0'
+            'daily_late.saturday' => 'nullable|numeric|min:0',
+            'daily_site_address' => 'nullable|array',
+            'daily_site_address.monday' => 'nullable|string',
+            'daily_site_address.tuesday' => 'nullable|string',
+            'daily_site_address.wednesday' => 'nullable|string',
+            'daily_site_address.thursday' => 'nullable|string',
+            'daily_site_address.friday' => 'nullable|string',
+            'daily_site_address.saturday' => 'nullable|string'
         ]);
 
         if ($validator->fails()) {
@@ -94,6 +101,7 @@ class PayrollController extends Controller
             $dailyAttendance = $this->processDailyAttendance($request->input('daily_attendance', []));
             $dailyOvertime = $this->processDailyOvertime($request->input('daily_overtime', []));
             $dailyLate = $this->processDailyLate($request->input('daily_late', []));
+            $dailySiteAddress = $this->processDailySiteAddress($request->input('daily_site_address', []));
 
             // Calculate payroll with daily data
             $calculations = $this->calculatePayrollWithDaily($employee, $request->all(), $dailyAttendance, $dailyOvertime, $dailyLate);
@@ -114,6 +122,7 @@ class PayrollController extends Controller
                 'daily_attendance' => json_encode($dailyAttendance),
                 'daily_overtime' => json_encode($dailyOvertime),
                 'daily_late' => json_encode($dailyLate),
+                'daily_site_address' => json_encode($dailySiteAddress),
                 'basic_salary' => $calculations['basic_salary'],
                 'overtime_pay' => $calculations['overtime_pay'],
                 'late_deduction' => $calculations['late_deduction'],
@@ -134,6 +143,7 @@ class PayrollController extends Controller
             $payrollData['daily_attendance'] = $dailyAttendance;
             $payrollData['daily_overtime'] = $dailyOvertime;
             $payrollData['daily_late'] = $dailyLate;
+            $payrollData['daily_site_address'] = $dailySiteAddress;
 
             return response()->json([
                 'success' => true,
@@ -164,6 +174,7 @@ class PayrollController extends Controller
                 $payroll->daily_attendance = json_decode($payroll->daily_attendance, true);
                 $payroll->daily_overtime = json_decode($payroll->daily_overtime, true);
                 $payroll->daily_late = json_decode($payroll->daily_late, true);
+                $payroll->daily_site_address = json_decode($payroll->daily_site_address, true);
                 return $payroll;
             });
 
@@ -199,6 +210,7 @@ class PayrollController extends Controller
             $payroll->daily_attendance = json_decode($payroll->daily_attendance, true);
             $payroll->daily_overtime = json_decode($payroll->daily_overtime, true);
             $payroll->daily_late = json_decode($payroll->daily_late, true);
+            $payroll->daily_site_address = json_decode($payroll->daily_site_address, true);
 
             return response()->json([
                 'success' => true,
@@ -396,6 +408,21 @@ class PayrollController extends Controller
 
         foreach ($days as $day) {
             $processed[$day] = isset($dailyLate[$day]) ? (float)$dailyLate[$day] : 0;
+        }
+
+        return $processed;
+    }
+
+    /**
+     * Process daily site address data
+     */
+    private function processDailySiteAddress($dailySiteAddress)
+    {
+        $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        $processed = [];
+
+        foreach ($days as $day) {
+            $processed[$day] = isset($dailySiteAddress[$day]) ? $dailySiteAddress[$day] : '';
         }
 
         return $processed;

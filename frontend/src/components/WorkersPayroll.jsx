@@ -265,6 +265,7 @@ const AttendanceDetailModal = React.memo(({ isOpen, onClose, record }) => {
                           <th className="text-center py-3 px-4 text-sm font-medium text-gray-700 border-b">Status</th>
                           <th className="text-center py-3 px-4 text-sm font-medium text-gray-700 border-b">Overtime (hrs)</th>
                           <th className="text-center py-3 px-4 text-sm font-medium text-gray-700 border-b">Late (mins)</th>
+                          <th className="text-center py-3 px-4 text-sm font-medium text-gray-700 border-b">Site Address</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -287,6 +288,9 @@ const AttendanceDetailModal = React.memo(({ isOpen, onClose, record }) => {
                             </td>
                             <td className="py-3 px-4 text-center text-sm text-gray-900 border-b">
                               {day.present && day.late !== '0' ? `${day.late} mins` : '-'}
+                            </td>
+                            <td className="py-3 px-4 text-center text-sm text-gray-900 border-b">
+                              {day.present ? `${day.site_address}` : '-'}
                             </td>
                           </tr>
                         ))}
@@ -371,7 +375,16 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
       friday: '',
       saturday: ''
     },
+    siteAddress: {
+      monday: '',
+      tuesday: '',
+      wednesday: '',
+      thursday: '',
+      friday: '',
+      saturday: ''
+    },
     cashAdvance: '',
+    cashAdvanceBalance: '',
     othersDeduction: ''
   })
 
@@ -412,7 +425,16 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
           friday: '',
           saturday: ''
         },
+        siteAddress: {
+          monday: '',
+          tuesday: '',
+          wednesday: '',
+          thursday: '',
+          friday: '',
+          saturday: ''
+        },
         cashAdvance: '',
+        cashAdvanceBalance: '',
         othersDeduction: ''
       })
     }
@@ -589,7 +611,8 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
       // Add daily attendance data
       daily_attendance: formData.workingDays,
       daily_overtime: formData.overtime,
-      daily_late: formData.late
+      daily_late: formData.late,
+      daily_site_address: formData.siteAddress
     }
 
     onSubmit(payrollData)
@@ -731,6 +754,7 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                               <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">Present</th>
                               <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">OT (hrs)</th>
                               <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">Late (mins)</th>
+                              <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">Site Address</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -772,6 +796,18 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                                     }`}
                                     placeholder="0"
                                     min="0"
+                                    disabled={isSubmitting || !formData.workingDays[day]}
+                                  />
+                                </td>
+                                <td className="py-2 px-3">
+                                  <input
+                                    type="text"
+                                    value={formData.siteAddress[day]}
+                                    onChange={(e) => handleInputChange(`siteAddress.${day}`, e.target.value)}
+                                    className={`w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none ${
+                                      !formData.workingDays[day] ? 'bg-gray-100 cursor-not-allowed' : ''
+                                    }`}
+                                    placeholder="Enter site address"
                                     disabled={isSubmitting || !formData.workingDays[day]}
                                   />
                                 </td>
