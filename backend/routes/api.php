@@ -25,6 +25,7 @@ Route::post('/login', [AuthController::class, 'login']);
 
 // Expense routes (public for now, can be protected later)
 Route::apiResource('expenses', ExpenseController::class);
+Route::get('expenses/stats/mop', [ExpenseController::class, 'getMopStats']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
