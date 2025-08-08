@@ -150,237 +150,13 @@ const SuccessAlert = React.memo(({ message, isVisible, onClose }) => {
   )
 })
 
-// Delete Confirmation Modal
-const DeleteConfirmationModal = React.memo(({ isOpen, onClose, onConfirm, record, isDeleting }) => {
-  if (!isOpen || !record) return null
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-white rounded-lg shadow-xl max-w-md w-full"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="p-6">
-            <div className="flex items-center mb-4">
-              <div className="p-3 bg-red-100 rounded-full mr-4">
-                <AlertCircle className="h-6 w-6 text-red-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Delete Payroll Record</h3>
-                <p className="text-sm text-gray-600">This action cannot be undone</p>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <p className="text-gray-700">
-                Are you sure you want to delete the payroll record for{' '}
-                <span className="font-semibold">{record.employee_name}</span>?
-              </p>
-              <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">
-                  Pay Period: {record.pay_period_start} to {record.pay_period_end}
-                </p>
-                <p className="text-sm text-gray-600">
-                  Net Pay: ₱{parseFloat(record.net_pay || 0).toFixed(2)}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3">
-              <Button
-                variant="outline"
-                onClick={onClose}
-                disabled={isDeleting}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={onConfirm}
-                disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  )
-})
-
-// Update Payroll Modal
-const UpdatePayrollModal = React.memo(({ isOpen, onClose, record, onUpdate, isUpdating }) => {
-  const [formData, setFormData] = useState({
-    status: '',
-    cash_advance: '',
-    others_deduction: ''
-  })
-
-  useEffect(() => {
-    if (isOpen && record) {
-      setFormData({
-        status: record.status || 'Pending',
-        cash_advance: record.cash_advance || '',
-        others_deduction: record.others_deduction || ''
-      })
-    }
-  }, [isOpen, record])
-
-  const handleInputChange = useCallback((field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
-  }, [])
-
-  const handleSubmit = useCallback(() => {
-    onUpdate(record.id, formData)
-  }, [record, formData, onUpdate])
-
-  if (!isOpen || !record) return null
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-white rounded-lg shadow-xl max-w-md w-full"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">
-                Update Payroll Record
-              </h2>
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-sm text-gray-600">Employee</p>
-                <p className="font-medium">{record.employee_name}</p>
-                <p className="text-xs text-gray-500">{record.employee_code} • {record.position}</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => handleInputChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-                  disabled={isUpdating}
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Processing">Processing</option>
-                  <option value="Paid">Paid</option>
-                  <option value="On Hold">On Hold</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cash Advance
-                </label>
-                <input
-                  type="number"
-                  value={formData.cash_advance}
-                  onChange={(e) => handleInputChange('cash_advance', e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                  disabled={isUpdating}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Others Deduction
-                </label>
-                <input
-                  type="number"
-                  value={formData.others_deduction}
-                  onChange={(e) => handleInputChange('others_deduction', e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                  disabled={isUpdating}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button
-                variant="outline"
-                onClick={onClose}
-                disabled={isUpdating}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={isUpdating}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {isUpdating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Updating...
-                  </>
-                ) : (
-                  <>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Update
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  )
-})
-
 // Attendance Detail Modal
 const AttendanceDetailModal = React.memo(({ isOpen, onClose, record }) => {
   const [attendanceData, setAttendanceData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // API base URL
 
   // Fetch attendance data when modal opens
   useEffect(() => {
@@ -425,13 +201,13 @@ const AttendanceDetailModal = React.memo(({ isOpen, onClose, record }) => {
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
-                Attendance Details - {record.employee_name}
+                Attendance Details - {record.name}
               </h2>
               <Button variant="ghost" size="sm" onClick={onClose}>
                 <X className="h-5 w-5" />
@@ -514,7 +290,7 @@ const AttendanceDetailModal = React.memo(({ isOpen, onClose, record }) => {
                               {day.present && day.late !== '0' ? `${day.late} mins` : '-'}
                             </td>
                             <td className="py-3 px-4 text-center text-sm text-gray-900 border-b">
-                              {day.present && day.site_address ? day.site_address : '-'}
+                              {day.present ? `${day.site_address}` : '-'}
                             </td>
                           </tr>
                         ))}
@@ -571,11 +347,6 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
   const [loadingEmployees, setLoadingEmployees] = useState(false)
   const [employeeError, setEmployeeError] = useState('')
   
-  // ECA/ED state
-  const [ecaEdData, setEcaEdData] = useState(null)
-  const [loadingEcaEd, setLoadingEcaEd] = useState(false)
-  const [ecaEdError, setEcaEdError] = useState('')
-  
   // Payroll form data
   const [formData, setFormData] = useState({
     payPeriodStart: '',
@@ -619,6 +390,8 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
     othersDeduction: ''
   })
 
+  // API base URL
+
   // Reset modal when opened/closed
   useEffect(() => {
     if (isOpen) {
@@ -627,8 +400,6 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
       setSelectedEmployee('')
       setEmployees([])
       setEmployeeError('')
-      setEcaEdData(null)
-      setEcaEdError('')
       setFormData({
         payPeriodStart: '',
         payPeriodEnd: '',
@@ -698,43 +469,16 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
           setEmployeeError(`No ${status} employees found. Please add employees first.`)
         }
       } else {
-        setEmployeeError(data.message || `Failed to fetch ${status} employees`)
+        console.error('Failed to fetch employees:', data.message)
+        setEmployeeError(data.message || 'Failed to fetch employees')
+        setEmployees([])
       }
     } catch (error) {
       console.error('Error fetching employees:', error)
-      setEmployeeError(`Failed to fetch ${status} employees. Please check your connection.`)
+      setEmployeeError(`Error: ${error.message}. Please check if the backend is running and accessible.`)
+      setEmployees([])
     } finally {
       setLoadingEmployees(false)
-    }
-  }, [])
-
-  // Fetch employee ECA/ED data
-  const fetchEmployeeEcaEd = useCallback(async (employeeId) => {
-    try {
-      setLoadingEcaEd(true)
-      setEcaEdError('')
-      
-      const response = await fetch(`${API_BASE_URL}/employees/${employeeId}/eca-ed`)
-      const data = await response.json()
-      
-      if (data.success) {
-        setEcaEdData(data.data)
-        
-        // Auto-fill cash advance if ED exists
-        if (data.data.ed && data.data.ed.amount) {
-          setFormData(prev => ({
-            ...prev,
-            cashAdvance: data.data.ed.amount.toString()
-          }))
-        }
-      } else {
-        setEcaEdError(data.message || 'Failed to fetch ECA/ED data')
-      }
-    } catch (error) {
-      console.error('Error fetching ECA/ED data:', error)
-      setEcaEdError('Failed to fetch ECA/ED data')
-    } finally {
-      setLoadingEcaEd(false)
     }
   }, [])
 
@@ -744,20 +488,6 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
     setStep(2)
     fetchEmployeesByStatus(type)
   }, [fetchEmployeesByStatus])
-
-  // Handle employee selection
-  const handleEmployeeSelect = useCallback((employeeId) => {
-    setSelectedEmployee(employeeId)
-    if (employeeId) {
-      fetchEmployeeEcaEd(employeeId)
-    } else {
-      setEcaEdData(null)
-      setFormData(prev => ({
-        ...prev,
-        cashAdvance: ''
-      }))
-    }
-  }, [fetchEmployeeEcaEd])
 
   // Calculate totals
   const calculations = useMemo(() => {
@@ -772,69 +502,62 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
         lateDeduction: 0,
         grossPay: 0,
         totalDeductions: 0,
-        netPay: 0,
-        deductionBreakdown: {
-          lateDeduction: 0,
-          cashAdvance: 0,
-          emergencyCashAdvance: 0,
-          emergencyDeduction: 0,
-          othersDeduction: 0
-        }
+        netPay: 0
       }
     }
 
-    const workingDaysCount = Object.values(formData.workingDays).filter(Boolean).length
-    const totalOT = Object.values(formData.overtime).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
-    const totalLate = Object.values(formData.late).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
-    
     const dailyRate = parseFloat(selectedEmp.rate) || 0
     const hourlyRate = parseFloat(selectedEmp.hourly_rate) || 0
+
+    // Count working days
+    const workingDaysCount = Object.values(formData.workingDays).filter(Boolean).length
+
+    // Calculate total OT hours
+    const totalOT = Object.values(formData.overtime).reduce((sum, ot) => {
+      return sum + (parseFloat(ot) || 0)
+    }, 0)
+
+    // Calculate total late minutes
+    const totalLate = Object.values(formData.late).reduce((sum, late) => {
+      return sum + (parseFloat(late) || 0)
+    }, 0)
+
+    // Calculate basic salary
+    const basicSalary = dailyRate * workingDaysCount
+
+    // Calculate overtime pay
+    const overtimePay = hourlyRate * totalOT
+
+    // Calculate late deduction (hourly rate * (late minutes / 60))
+    const lateDeduction = hourlyRate * (totalLate / 60)
+
+    // Calculate gross pay
+    const grossPay = basicSalary + overtimePay
+
+    // Calculate total deductions
     const cashAdvance = parseFloat(formData.cashAdvance) || 0
     const emergencyCashAdvance = parseFloat(formData.emergencyCashAdvance) || 0
     const emergencyDeduction = parseFloat(formData.emergencyDeduction) || 0
     const othersDeduction = parseFloat(formData.othersDeduction) || 0
+    const totalDeductions = lateDeduction + cashAdvance + othersDeduction
 
-    // Basic salary calculation
-    const basicSalary = workingDaysCount * dailyRate
-    const overtimePay = totalOT * hourlyRate
-    const lateDeduction = (totalLate / 60) * hourlyRate
-    const grossPay = basicSalary + overtimePay
-    // Deduction breakdown
-    const deductionBreakdown = {
-      lateDeduction: lateDeduction,
-      cashAdvance: cashAdvance,
-      emergencyCashAdvance: emergencyCashAdvance,
-      emergencyDeduction: emergencyDeduction,
-      othersDeduction: othersDeduction
-    }
-
-    // Total deductions
-    const totalDeductions = lateDeduction + cashAdvance + emergencyCashAdvance + emergencyDeduction + othersDeduction
-
-    // Net pay
+    // Calculate net pay
     const netPay = grossPay - totalDeductions
 
     return {
       workingDaysCount,
-      totalOT: totalOT.toFixed(1),
-      totalLate: totalLate.toFixed(0),
+      totalOT: totalOT.toFixed(2),
+      totalLate: totalLate.toFixed(2),
       basicSalary: basicSalary.toFixed(2),
       overtimePay: overtimePay.toFixed(2),
       lateDeduction: lateDeduction.toFixed(2),
       grossPay: grossPay.toFixed(2),
       totalDeductions: totalDeductions.toFixed(2),
-      netPay: netPay.toFixed(2),
-      deductionBreakdown: {
-        lateDeduction: lateDeduction.toFixed(2),
-        cashAdvance: cashAdvance.toFixed(2),
-        emergencyCashAdvance: emergencyCashAdvance.toFixed(2),
-        emergencyDeduction: emergencyDeduction.toFixed(2),
-        othersDeduction: othersDeduction.toFixed(2)
-      }
+      netPay: netPay.toFixed(2)
     }
   }, [selectedEmployee, employees, formData])
 
-  // Handle input changes
+  // Handle form input changes
   const handleInputChange = useCallback((field, value) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.')
@@ -846,22 +569,34 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
         }
       }))
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [field]: value
-      }))
+      setFormData(prev => ({ ...prev, [field]: value }))
     }
   }, [])
 
-  // Handle checkbox changes for working days
+  // Handle checkbox changes
   const handleCheckboxChange = useCallback((day) => {
-    setFormData(prev => ({
-      ...prev,
-      workingDays: {
+    setFormData(prev => {
+      const newWorkingDays = {
         ...prev.workingDays,
         [day]: !prev.workingDays[day]
       }
-    }))
+      
+      // If unchecking a day, clear its OT and Late values
+      const newOvertime = { ...prev.overtime }
+      const newLate = { ...prev.late }
+      
+      if (!newWorkingDays[day]) {
+        newOvertime[day] = ''
+        newLate[day] = ''
+      }
+      
+      return {
+        ...prev,
+        workingDays: newWorkingDays,
+        overtime: newOvertime,
+        late: newLate
+      }
+    })
   }, [])
 
   // Handle form submission
@@ -900,9 +635,6 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
   const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
   const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-  // Check if ECA/ED fields should be readonly
-  const isEcaEdReadonly = ecaEdData?.is_readonly || false
-
   if (!isOpen) return null
 
   return (
@@ -918,7 +650,7 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="p-6">
@@ -977,7 +709,7 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                       label="Select Employee"
                       required={true}
                       value={selectedEmployee}
-                      onChange={handleEmployeeSelect}
+                      onChange={setSelectedEmployee}
                       options={employeeOptions}
                       placeholder={loadingEmployees ? "Loading employees..." : employeeError || "Select an employee"}
                       disabled={loadingEmployees || isSubmitting || employees.length === 0}
@@ -1017,76 +749,6 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                   </div>
                 </div>
 
-                {/* ECA/ED Information Display */}
-                {selectedEmployee && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Emergency Cash Advance & Deduction Status</h3>
-                    
-                    {loadingEcaEd && (
-                      <div className="flex items-center">
-                        <Loader2 className="h-4 w-4 animate-spin text-blue-600 mr-2" />
-                        <span className="text-gray-600">Loading ECA/ED data...</span>
-                      </div>
-                    )}
-
-                    {ecaEdError && (
-                      <div className="text-red-600 text-sm">{ecaEdError}</div>
-                    )}
-
-                    {ecaEdData && !loadingEcaEd && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {ecaEdData.has_active_eca ? (
-                          <div className="bg-white rounded-lg p-3 border">
-                            <h4 className="font-medium text-gray-900 mb-2">Active Emergency Cash Advance</h4>
-                            <div className="space-y-1 text-sm">
-                              <p><span className="text-gray-600">Original Amount:</span> ₱{parseFloat(ecaEdData.eca.amount).toFixed(2)}</p>
-                              <p><span className="text-gray-600">Remaining Balance:</span> ₱{parseFloat(ecaEdData.eca.remaining_balance).toFixed(2)}</p>
-                              <p><span className="text-gray-600">Status:</span> 
-                                <span className="ml-1 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
-                                  {ecaEdData.eca.status}
-                                </span>
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="bg-white rounded-lg p-3 border">
-                            <h4 className="font-medium text-gray-900 mb-2">Emergency Cash Advance</h4>
-                            <p className="text-sm text-gray-600">No active ECA found</p>
-                          </div>
-                        )}
-
-                        {ecaEdData.has_active_ed ? (
-                          <div className="bg-white rounded-lg p-3 border">
-                            <h4 className="font-medium text-gray-900 mb-2">Active Emergency Deduction</h4>
-                            <div className="space-y-1 text-sm">
-                              <p><span className="text-gray-600">Deduction Amount:</span> ₱{parseFloat(ecaEdData.ed.amount).toFixed(2)}</p>
-                              <p><span className="text-gray-600">Status:</span> 
-                                <span className="ml-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                                  {ecaEdData.ed.status}
-                                </span>
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="bg-white rounded-lg p-3 border">
-                            <h4 className="font-medium text-gray-900 mb-2">Emergency Deduction</h4>
-                            <p className="text-sm text-gray-600">No active ED found</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {isEcaEdReadonly && (
-                      <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
-                        <p className="text-sm text-blue-800">
-                          <AlertCircle className="h-4 w-4 inline mr-1" />
-                          ECA/ED fields are readonly until the emergency cash advance is fully paid.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {selectedEmployee && (
                   <>
                     {/* Daily Attendance Grid */}
@@ -1114,7 +776,7 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                                     type="checkbox"
                                     checked={formData.workingDays[day]}
                                     onChange={() => handleCheckboxChange(day)}
-                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                     disabled={isSubmitting}
                                   />
                                 </td>
@@ -1123,7 +785,9 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                                     type="number"
                                     value={formData.overtime[day]}
                                     onChange={(e) => handleInputChange(`overtime.${day}`, e.target.value)}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                    className={`w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none ${
+                                      !formData.workingDays[day] ? 'bg-gray-100 cursor-not-allowed' : ''
+                                    }`}
                                     placeholder="0"
                                     min="0"
                                     step="0.5"
@@ -1135,7 +799,9 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                                     type="number"
                                     value={formData.late[day]}
                                     onChange={(e) => handleInputChange(`late.${day}`, e.target.value)}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                    className={`w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none ${
+                                      !formData.workingDays[day] ? 'bg-gray-100 cursor-not-allowed' : ''
+                                    }`}
                                     placeholder="0"
                                     min="0"
                                     disabled={isSubmitting || !formData.workingDays[day]}
@@ -1146,8 +812,10 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                                     type="text"
                                     value={formData.siteAddress[day]}
                                     onChange={(e) => handleInputChange(`siteAddress.${day}`, e.target.value)}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
-                                    placeholder="Site address"
+                                    className={`w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none ${
+                                      !formData.workingDays[day] ? 'bg-gray-100 cursor-not-allowed' : ''
+                                    }`}
+                                    placeholder="Enter site address"
                                     disabled={isSubmitting || !formData.workingDays[day]}
                                   />
                                 </td>
@@ -1156,34 +824,44 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                           </tbody>
                         </table>
                       </div>
+                    </div>
 
-                      {/* Summary Row */}
-                      <div className="mt-4 bg-blue-50 rounded-lg p-3">
-                        <div className="grid grid-cols-4 gap-4 text-center">
-                          <div>
-                            <p className="text-xs text-gray-600">Working Days</p>
-                            <p className="text-lg font-semibold text-blue-600">{calculations.workingDaysCount}</p>
+                    {/* Calculations Summary */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Automated Calculations */}
+                      <div className="bg-blue-50 rounded-lg p-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Automated Calculations</h3>
+                        <div className="space-y-3">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Working Days:</span>
+                            <span className="text-sm font-medium">{calculations.workingDaysCount} days</span>
                           </div>
-                          <div>
-                            <p className="text-xs text-gray-600">Total OT</p>
-                            <p className="text-lg font-semibold text-green-600">{calculations.totalOT}h</p>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Total OT:</span>
+                            <span className="text-sm font-medium">{calculations.totalOT} hrs</span>
                           </div>
-                          <div>
-                            <p className="text-xs text-gray-600">Total Late</p>
-                            <p className="text-lg font-semibold text-red-600">{calculations.totalLate} mins</p>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Total Late:</span>
+                            <span className="text-sm font-medium">{calculations.totalLate} mins</span>
                           </div>
-                          <div>
-                            <p className="text-xs text-gray-600">Basic Salary</p>
-                            <p className="text-lg font-semibold text-purple-600">₱{calculations.basicSalary}</p>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Basic Salary:</span>
+                            <span className="text-sm font-medium">₱{calculations.basicSalary}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Overtime Pay:</span>
+                            <span className="text-sm font-medium text-green-600">+₱{calculations.overtimePay}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Late Deduction:</span>
+                            <span className="text-sm font-medium text-red-600">-₱{calculations.lateDeduction}</span>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Deductions Section */}
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Deductions</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Manual Deductions */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-gray-900">Deduction Breakdown</h3>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Cash Advance
@@ -1192,21 +870,13 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                             type="number"
                             value={formData.cashAdvance}
                             onChange={(e) => handleInputChange('cashAdvance', e.target.value)}
-                            className={`w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none ${
-                              isEcaEdReadonly ? 'bg-gray-100 cursor-not-allowed' : ''
-                            }`}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
                             placeholder="0.00"
                             min="0"
                             step="0.01"
-                            disabled={isSubmitting || isEcaEdReadonly}
+                            disabled={isSubmitting}
                           />
-                          {isEcaEdReadonly && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Readonly - Employee has active ECA
-                            </p>
-                          )}
                         </div>
-
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Emergency Cash Advance
@@ -1215,21 +885,13 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                             type="number"
                             value={formData.emergencyCashAdvance}
                             onChange={(e) => handleInputChange('emergencyCashAdvance', e.target.value)}
-                            className={`w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none ${
-                              isEcaEdReadonly ? 'bg-gray-100 cursor-not-allowed' : ''
-                            }`}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
                             placeholder="0.00"
                             min="0"
                             step="0.01"
-                            disabled={isSubmitting || isEcaEdReadonly}
+                            disabled={isSubmitting}
                           />
-                          {isEcaEdReadonly && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Readonly - Employee has active ECA
-                            </p>
-                          )}
                         </div>
-
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Emergency Deduction
@@ -1238,21 +900,13 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                             type="number"
                             value={formData.emergencyDeduction}
                             onChange={(e) => handleInputChange('emergencyDeduction', e.target.value)}
-                            className={`w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none ${
-                              isEcaEdReadonly ? 'bg-gray-100 cursor-not-allowed' : ''
-                            }`}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
                             placeholder="0.00"
                             min="0"
                             step="0.01"
-                            disabled={isSubmitting || isEcaEdReadonly}
+                            disabled={isSubmitting}
                           />
-                          {isEcaEdReadonly && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Readonly - Employee has active ED
-                            </p>
-                          )}
                         </div>
-
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Others
@@ -1269,93 +923,54 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                           />
                         </div>
                       </div>
-
-                      {/* Detailed Deduction Breakdown */}
-                      <div className="mt-4 bg-white rounded-lg p-4 border">
-                        <h4 className="text-md font-semibold text-gray-900 mb-3">Detailed Deduction Breakdown</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
-                          <div className="bg-red-50 rounded-lg p-3">
-                            <p className="text-xs text-gray-600 mb-1">Late Deduction</p>
-                            <p className="text-sm font-semibold text-red-600">₱{calculations.deductionBreakdown.lateDeduction}</p>
-                          </div>
-                          <div className="bg-orange-50 rounded-lg p-3">
-                            <p className="text-xs text-gray-600 mb-1">Cash Advance</p>
-                            <p className="text-sm font-semibold text-orange-600">₱{calculations.deductionBreakdown.cashAdvance}</p>
-                          </div>
-                          <div className="bg-yellow-50 rounded-lg p-3">
-                            <p className="text-xs text-gray-600 mb-1">Emergency CA</p>
-                            <p className="text-sm font-semibold text-yellow-600">₱{calculations.deductionBreakdown.emergencyCashAdvance}</p>
-                          </div>
-                          <div className="bg-purple-50 rounded-lg p-3">
-                            <p className="text-xs text-gray-600 mb-1">Emergency Ded.</p>
-                            <p className="text-sm font-semibold text-purple-600">₱{calculations.deductionBreakdown.emergencyDeduction}</p>
-                          </div>
-                          <div className="bg-gray-50 rounded-lg p-3">
-                            <p className="text-xs text-gray-600 mb-1">Others</p>
-                            <p className="text-sm font-semibold text-gray-600">₱{calculations.deductionBreakdown.othersDeduction}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Final Summary */}
-                      <div className="bg-green-50 rounded-lg p-4 mt-4">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Final Summary</h3>
-                        <div className="space-y-3">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Basic Salary:</span>
-                            <span className="font-medium">₱{calculations.basicSalary}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Overtime Pay:</span>
-                            <span className="font-medium text-green-600">₱{calculations.overtimePay}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Gross Pay:</span>
-                            <span className="font-medium">₱{calculations.grossPay}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Total Deductions:</span>
-                            <span className="font-medium text-red-600">₱{calculations.totalDeductions}</span>
-                          </div>
-                          <div className="border-t pt-2">
-                            <div className="flex justify-between text-xl font-bold">
-                              <span>Net Pay:</span>
-                              <span className="text-green-600">₱{calculations.netPay}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex justify-between pt-6 border-t border-gray-200">
-                      <Button
-                        variant="outline"
-                        onClick={() => setStep(1)}
-                        disabled={isSubmitting}
-                      >
-                        Back
-                      </Button>
-                      <Button
-                        onClick={handleSubmit}
-                        disabled={isSubmitting || !selectedEmployee || !formData.payPeriodStart || !formData.payPeriodEnd}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            Processing...
-                          </>
-                        ) : (
-                          <>
-                            <Calculator className="h-4 w-4 mr-2" />
-                            Process Payroll
-                          </>
-                        )}
-                      </Button>
+                    {/* Final Summary */}
+                    <div className="bg-white border-2 border-gray-200 rounded-lg p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Payroll Summary</h3>
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                          <p className="text-sm text-gray-600 mb-1">Gross Pay</p>
+                          <p className="text-2xl font-bold text-green-600">₱{calculations.grossPay}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 mb-1">Total Deductions</p>
+                          <p className="text-2xl font-bold text-red-600">₱{calculations.totalDeductions}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 mb-1">Net Pay</p>
+                          <p className="text-2xl font-bold text-blue-600">₱{calculations.netPay}</p>
+                        </div>
+                      </div>
                     </div>
                   </>
                 )}
+
+                {/* Action Buttons */}
+                <div className="flex space-x-3 pt-6 border-t">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1" 
+                    onClick={() => setStep(1)} 
+                    disabled={isSubmitting}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    onClick={handleSubmit}
+                    disabled={!selectedEmployee || !formData.payPeriodStart || !formData.payPeriodEnd || isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      'Process Payroll'
+                    )}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -1365,55 +980,99 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
   )
 })
 
-// Main WorkersPayroll Component
-const WorkersPayroll = () => {
+// Filter options
+const statusOptions = [
+  { value: 'All', label: 'All Status' },
+  { value: 'Paid', label: 'Paid' },
+  { value: 'Processing', label: 'Processing' },
+  { value: 'Pending', label: 'Pending' },
+  { value: 'On Hold', label: 'On Hold' }
+]
+
+const departmentOptions = [
+  { value: 'All', label: 'All Departments' },
+  { value: 'Site', label: 'Site' },
+  { value: 'Office', label: 'Office' }
+]
+
+const paymentMethodOptions = [
+  { value: 'All', label: 'All Methods' },
+  { value: 'Direct Deposit', label: 'Direct Deposit' },
+  { value: 'Check', label: 'Check' },
+  { value: 'Cash', label: 'Cash' }
+]
+
+function WorkersPayroll() {
   const [payrollRecords, setPayrollRecords] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [departmentFilter, setDepartmentFilter] = useState('all')
-  const [viewMode, setViewMode] = useState('card')
-  const [showProcessModal, setShowProcessModal] = useState(false)
-  const [showAttendanceModal, setShowAttendanceModal] = useState(false)
-  const [showUpdateModal, setShowUpdateModal] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [selectedStatus, setSelectedStatus] = useState('All')
+  const [selectedDepartment, setSelectedDepartment] = useState('All')
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('All')
+  const [isProcessModalOpen, setIsProcessModalOpen] = useState(false)
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
+  const [successAlert, setSuccessAlert] = useState({ isVisible: false, message: '' })
+  const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState('card') // 'table' or 'card'
 
-  // Fetch payroll records
+  // API base URL
+
+  // Fetch payroll records from backend
   const fetchPayrollRecords = useCallback(async () => {
     try {
       setLoading(true)
-      setError('')
-      
       const response = await fetch(`${API_BASE_URL}/payrolls`)
       const data = await response.json()
       
       if (data.success) {
-        setPayrollRecords(data.data || [])
+        // Transform backend data to match frontend format
+        const transformedRecords = data.data.map(record => ({
+          id: record.id,
+          employeeId: record.employee_code,
+          name: record.employee_name,
+          position: record.position,
+          department: record.payroll_type,
+          payPeriod: `${record.pay_period_start} to ${record.pay_period_end}`,
+          hoursWorked: parseFloat(record.working_days) * 8, // Assuming 8 hours per day, ensure numeric
+          overtimeHours: parseFloat(record.overtime_hours) || 0,
+          hourlyRate: parseFloat(record.hourly_rate) || 0,
+          overtimeRate: parseFloat(record.hourly_rate) || 0,
+          grossPay: parseFloat(record.gross_pay) || 0,
+          deductions: {
+            late: parseFloat(record.late_deduction) || 0,
+            cashAdvance: parseFloat(record.cash_advance) || 0,
+            others: parseFloat(record.others_deduction) || 0
+          },
+          netPay: parseFloat(record.net_pay) || 0,
+          paymentDate: record.created_at ? record.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+          paymentMethod: "Pending",
+          status: record.status,
+          // Add daily attendance data
+          dailyAttendance: record.daily_attendance || {},
+          dailyOvertime: record.daily_overtime || {},
+          dailyLate: record.daily_late || {}
+        }))
+        setPayrollRecords(transformedRecords)
       } else {
-        setError(data.message || 'Failed to fetch payroll records')
+        console.error('Failed to fetch payroll records:', data.message)
+        setPayrollRecords([])
       }
     } catch (error) {
       console.error('Error fetching payroll records:', error)
-      setError('Failed to fetch payroll records. Please check your connection.')
+      setPayrollRecords([])
     } finally {
       setLoading(false)
     }
   }, [])
 
-  // Load data on component mount
+  // Load payroll records on component mount
   useEffect(() => {
     fetchPayrollRecords()
   }, [fetchPayrollRecords])
 
-  // Handle payroll submission
-  const handlePayrollSubmit = useCallback(async (payrollData) => {
+  // Process payroll submission
+  const handleProcessPayroll = useCallback(async (payrollData) => {
     try {
       setIsSubmitting(true)
       console.log('Submitting payroll data:', payrollData)
@@ -1427,149 +1086,234 @@ const WorkersPayroll = () => {
       })
       
       const data = await response.json()
-      console.log('Response:', data)
+      console.log('Payroll response:', data)
       
       if (data.success) {
-        setSuccessMessage('Payroll processed successfully!')
-        setShowSuccessAlert(true)
-        setShowProcessModal(false)
-        fetchPayrollRecords() // Refresh the list
+        // Add new payroll record to the list
+        const newRecord = {
+          id: data.data.id,
+          employeeId: data.data.employee_code,
+          name: data.data.employee_name,
+          position: data.data.position,
+          department: data.data.payroll_type,
+          payPeriod: `${data.data.pay_period_start} to ${data.data.pay_period_end}`,
+          hoursWorked: parseFloat(data.data.working_days) * 8, // Assuming 8 hours per day, ensure numeric
+          overtimeHours: parseFloat(data.data.overtime_hours) || 0,
+          hourlyRate: parseFloat(data.data.hourly_rate) || 0,
+          overtimeRate: parseFloat(data.data.hourly_rate) || 0,
+          grossPay: parseFloat(data.data.gross_pay) || 0,
+          deductions: {
+            late: parseFloat(data.data.late_deduction) || 0,
+            cashAdvance: parseFloat(data.data.cash_advance) || 0,
+            others: parseFloat(data.data.others_deduction) || 0
+          },
+          netPay: parseFloat(data.data.net_pay) || 0,
+          paymentDate: new Date().toISOString().split("T")[0],
+          paymentMethod: "Pending",
+          status: data.data.status,
+          // Add daily attendance data
+          dailyAttendance: data.data.daily_attendance || {},
+          dailyOvertime: data.data.daily_overtime || {},
+          dailyLate: data.data.daily_late || {}
+        }
+
+        setPayrollRecords(prev => [newRecord, ...prev])
+        setIsProcessModalOpen(false)
+        setSuccessAlert({
+          isVisible: true,
+          message: 'Payroll processed successfully!'
+        })
       } else {
-        setError(data.message || 'Failed to process payroll')
+        console.error('Failed to process payroll:', data.message)
+        alert(`Failed to process payroll: ${data.message}`)
       }
     } catch (error) {
       console.error('Error processing payroll:', error)
-      setError('Failed to process payroll. Please check your connection.')
+      alert(`Error processing payroll: ${error.message}`)
     } finally {
       setIsSubmitting(false)
     }
-  }, [fetchPayrollRecords])
+  }, [])
 
-  // Handle record update
-  const handleUpdateRecord = useCallback(async (recordId, updateData) => {
-    try {
-      setIsUpdating(true)
-      
-      const response = await fetch(`${API_BASE_URL}/payrolls/${recordId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData)
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        setSuccessMessage('Payroll record updated successfully!')
-        setShowSuccessAlert(true)
-        setShowUpdateModal(false)
-        fetchPayrollRecords() // Refresh the list
-      } else {
-        setError(data.message || 'Failed to update record')
-      }
-    } catch (error) {
-      console.error('Error updating record:', error)
-      setError('Failed to update record. Please check your connection.')
-    } finally {
-      setIsUpdating(false)
-    }
-  }, [fetchPayrollRecords])
+  // Handle view attendance
+  const handleViewAttendance = useCallback((record) => {
+    setSelectedRecord(record)
+    setIsAttendanceModalOpen(true)
+  }, [])
 
-  // Handle record deletion
-  const handleDeleteRecord = useCallback(async () => {
-    if (!selectedRecord) return
-
-    try {
-      setIsDeleting(true)
-      
-      const response = await fetch(`${API_BASE_URL}/payrolls/${selectedRecord.id}`, {
-        method: 'DELETE'
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        setSuccessMessage('Payroll record deleted successfully!')
-        setShowSuccessAlert(true)
-        setShowDeleteModal(false)
-        setSelectedRecord(null)
-        fetchPayrollRecords() // Refresh the list
-      } else {
-        setError(data.message || 'Failed to delete record')
-      }
-    } catch (error) {
-      console.error('Error deleting record:', error)
-      setError('Failed to delete record. Please check your connection.')
-    } finally {
-      setIsDeleting(false)
-    }
-  }, [selectedRecord, fetchPayrollRecords])
-
-  // Filter and search records
+  // Filter records based on search and filters
   const filteredRecords = useMemo(() => {
     return payrollRecords.filter(record => {
-      const matchesSearch = record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           record.employee_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           record.position?.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesSearch = record.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           record.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           record.position.toLowerCase().includes(searchTerm.toLowerCase())
       
-      const matchesStatus = statusFilter === 'all' || record.status === statusFilter
-      const matchesDepartment = departmentFilter === 'all' || record.payroll_type === departmentFilter
+      const matchesStatus = selectedStatus === 'All' || record.status === selectedStatus
+      const matchesDepartment = selectedDepartment === 'All' || record.department === selectedDepartment
+      const matchesPaymentMethod = selectedPaymentMethod === 'All' || record.paymentMethod === selectedPaymentMethod
       
-      return matchesSearch && matchesStatus && matchesDepartment
+      return matchesSearch && matchesStatus && matchesDepartment && matchesPaymentMethod
     })
-  }, [payrollRecords, searchTerm, statusFilter, departmentFilter])
+  }, [payrollRecords, searchTerm, selectedStatus, selectedDepartment, selectedPaymentMethod])
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
-    const totalRecords = payrollRecords.length
-    const totalGrossPay = payrollRecords.reduce((sum, record) => sum + parseFloat(record.gross_pay || 0), 0)
-    const totalDeductions = payrollRecords.reduce((sum, record) => sum + parseFloat(record.total_deductions || 0), 0)
-    const totalNetPay = payrollRecords.reduce((sum, record) => sum + parseFloat(record.net_pay || 0), 0)
-    
+    const totalRecords = filteredRecords.length
+    const totalGrossPay = filteredRecords.reduce((sum, record) => sum + record.grossPay, 0)
+    const totalNetPay = filteredRecords.reduce((sum, record) => sum + record.netPay, 0)
+    const totalDeductions = filteredRecords.reduce((sum, record) => 
+      sum + record.deductions.late + record.deductions.cashAdvance + record.deductions.others, 0)
+
     return {
       totalRecords,
       totalGrossPay,
-      totalDeductions,
-      totalNetPay
+      totalNetPay,
+      totalDeductions
     }
-  }, [payrollRecords])
+  }, [filteredRecords])
 
-  // Status options for dropdown
-  const statusOptions = [
-    { value: 'all', label: 'All Status' },
-    { value: 'Pending', label: 'Pending' },
-    { value: 'Processing', label: 'Processing' },
-    { value: 'Paid', label: 'Paid' },
-    { value: 'On Hold', label: 'On Hold' }
-  ]
-
-  // Department options for dropdown
-  const departmentOptions = [
-    { value: 'all', label: 'All Departments' },
-    { value: 'Site', label: 'Site' },
-    { value: 'Office', label: 'Office' }
-  ]
-
-  // Status badge component
-  const StatusBadge = React.memo(({ status }) => {
-    const statusConfig = {
-      'Pending': { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: Clock },
-      'Processing': { bg: 'bg-blue-100', text: 'text-blue-800', icon: Loader2 },
-      'Paid': { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle },
-      'On Hold': { bg: 'bg-red-100', text: 'text-red-800', icon: AlertCircle }
+  // Helper functions for original card styling
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Paid': return 'bg-green-100 text-green-800 border-green-300'
+      case 'Processing': return 'bg-yellow-100 text-yellow-800 border-yellow-300'
+      case 'Pending': return 'bg-blue-100 text-blue-800 border-blue-300'
+      case 'On Hold': return 'bg-red-100 text-red-800 border-red-300'
+      default: return 'bg-gray-100 text-gray-800 border-gray-300'
     }
-    
-    const config = statusConfig[status] || statusConfig['Pending']
-    const IconComponent = config.icon
+  }
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'Paid': return CheckCircle
+      case 'Processing': return Clock
+      case 'Pending': return AlertCircle
+      case 'On Hold': return AlertCircle
+      default: return Clock
+    }
+  }
+
+  // Original PayrollCard Component (preserved exactly as user wanted)
+  const PayrollCard = ({ record, index }) => {
+    const StatusIcon = getStatusIcon(record.status)
+    const totalDeductions = (parseFloat(record.deductions.late) || 0) + (parseFloat(record.deductions.cashAdvance) || 0) + (parseFloat(record.deductions.others) || 0)
     
     return (
-      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-        <IconComponent className="h-3 w-3 mr-1" />
-        {status}
-      </span>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: index * 0.05 }}
+        whileHover={{ scale: 1.01 }}
+        className="group"
+      >
+        <Card className="bg-white border-gray-200 hover:border-blue-500 transition-all duration-300 shadow-md">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">{record.name}</h3>
+                <p className="text-sm text-gray-700 mb-1">{record.position}</p>
+                <p className="text-xs text-gray-500">{record.employeeId} • {record.department}</p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <StatusIcon className="h-4 w-4 text-blue-600" />
+                <span className={`px-2 py-1 rounded-full text-xs border ${getStatusColor(record.status)}`}>
+                  {record.status}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="space-y-2">
+                <div className="text-sm">
+                  <span className="text-gray-600">Pay Period:</span>
+                  <p className="text-gray-900 text-xs">{record.payPeriod}</p>
+                </div>
+                <div className="text-sm">
+                  <span className="text-gray-600">Hours Worked:</span>
+                  <p className="text-gray-900">{record.hoursWorked}h + {record.overtimeHours}h OT</p>
+                </div>
+                <div className="text-sm">
+                  <span className="text-gray-600">Hourly Rate:</span>
+                  <p className="text-gray-900">₱{record.hourlyRate}/hr</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm">
+                  <span className="text-gray-600">Payment Date:</span>
+                  <p className="text-gray-900">{record.paymentDate}</p>
+                </div>
+                <div className="text-sm">
+                  <span className="text-gray-600">Payment Method:</span>
+                  <p className="text-gray-900">{record.paymentMethod}</p>
+                </div>
+                <div className="text-sm">
+                  <span className="text-gray-600">Overtime Rate:</span>
+                  <p className="text-gray-900">₱{record.overtimeRate}/hr</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200 shadow-sm">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">Gross Pay</p>
+                  <p className="text-lg font-semibold text-blue-600">₱{(parseFloat(record.grossPay) || 0).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">Deductions</p>
+                  <p className="text-lg font-semibold text-red-600">-₱{totalDeductions.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">Net Pay</p>
+                  <p className="text-lg font-semibold text-blue-600">₱{(parseFloat(record.netPay) || 0).toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-900 mb-2">Deduction Breakdown:</h4>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="bg-white rounded p-2 text-center border border-gray-200 shadow-sm">
+                  <p className="text-gray-600">Late</p>
+                  <p className="text-red-600">₱{(parseFloat(record.deductions.late) || 0).toFixed(2)}</p>
+                </div>
+                <div className="bg-white rounded p-2 text-center border border-gray-200 shadow-sm">
+                  <p className="text-gray-600">Cash Advance</p>
+                  <p className="text-red-600">₱{(parseFloat(record.deductions.cashAdvance) || 0).toFixed(2)}</p>
+                </div>
+                <div className="bg-white rounded p-2 text-center border border-gray-200 shadow-sm">
+                  <p className="text-gray-600">Others</p>
+                  <p className="text-red-600">₱{(parseFloat(record.deductions.others) || 0).toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <div className="text-xs text-gray-600">
+                <span>Total Days: {Math.round((parseFloat(record.hoursWorked) || 0) / 8)}</span>
+              </div>
+              <div className="flex space-x-2">
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+                  onClick={() => handleViewAttendance(record)}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+                <Button size="sm" variant="ghost" className="text-gray-600 hover:bg-gray-50 hover:text-gray-800">
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button size="sm" variant="ghost" className="text-blue-600 hover:bg-blue-50 hover:text-blue-800">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     )
-  })
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -1582,78 +1326,79 @@ const WorkersPayroll = () => {
           className="flex flex-col md:flex-row md:items-center md:justify-between"
         >
           <div>
-            <h1 className="text-4xl font-bold text-gray-900">
+            <h1 className="text-4xl font-bold text-primary">
               Workers' Payroll
             </h1>
             <p className="text-gray-600 mt-2">Monitor payroll records and payments</p>
           </div>
           <div className="flex items-center space-x-3 mt-4 md:mt-0">
-            {/* View Toggle Buttons with Smooth Transitions */}
-            <div className="flex items-center relative bg-white border border-gray-200 rounded-lg p-1 overflow-hidden">
-              {/* Animated Background */}
-              <motion.div
-                className="absolute top-1 left-1 bottom-1 rounded-md bg-blue-600"
-                initial={false}
-                animate={{
-                  x: viewMode === 'card' ? 0 : 40, // adjust to match button width + spacing
-                  width: 38, // match button width including padding (px-3)
-                }}
-                transition={{
-                  type: "spring",
-                  stiffness: 300,
-                  damping: 30
-                }}
-              />
+  {/* View Toggle Buttons with Smooth Transitions */}
+  <div className="flex items-center relative bg-white border border-gray-200 rounded-lg p-1 overflow-hidden">
+    {/* Animated Background */}
+    <motion.div
+      className="absolute top-1 left-1 bottom-1 rounded-md bg-primary"
+      initial={false}
+      animate={{
+        x: viewMode === 'card' ? 0 : 40, // adjust to match button width + spacing
+        width: 38, // match button width including padding (px-3)
+      }}
+      transition={{
+        type: "spring",
+        stiffness: 300,
+        damping: 30
+      }}
+    />
 
-              {/* Toggle Button - Card View */}
-              <motion.button
-                onClick={() => setViewMode('card')}
-                className={`relative z-10 px-3 py-2 rounded-md transition-all duration-300 ${
-                  viewMode === 'card'
-                    ? 'text-white'
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Grid3X3 className="h-4 w-4" />
-              </motion.button>
+    {/* Toggle Button - Card View */}
+    <motion.button
+      onClick={() => setViewMode('card')}
+      className={`relative z-10 px-3 py-2 rounded-md transition-all duration-300 ${
+        viewMode === 'card'
+          ? 'text-white'
+          : 'text-gray-600 hover:text-blue-600'
+      }`}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+    >
+      <Grid3X3 className="h-4 w-4" />
+    </motion.button>
 
-              {/* Toggle Button - Table View */}
-              <motion.button
-                onClick={() => setViewMode('table')}
-                className={`relative z-10 px-3 py-2 rounded-md transition-all duration-300 ${
-                  viewMode === 'table'
-                    ? 'text-white'
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <List className="h-4 w-4" />
-              </motion.button>
-            </div>
+    {/* Toggle Button - Table View */}
+    <motion.button
+      onClick={() => setViewMode('table')}
+      className={`relative z-10 px-3 py-2 rounded-md transition-all duration-300 ${
+        viewMode === 'table'
+          ? 'text-white'
+          : 'text-gray-600 hover:text-blue-600'
+      }`}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+    >
+      <List className="h-4 w-4" />
+    </motion.button>
+  </div>
 
-            {/* Process Payroll Button */}
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                onClick={() => setShowProcessModal(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Process Payroll
-              </Button>
-            </motion.div>
-          </div>
+  {/* Process Payroll Button */}
+  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+    <Button
+      onClick={() => setIsProcessModalOpen(true)}
+      className="bg-primary hover:bg-primary/90 text-primary-foreground transition-all duration-300"
+    >
+      <Plus className="h-4 w-4 mr-2" />
+      Process Payroll
+    </Button>
+  </motion.div>
+</div>
+
         </motion.div>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[
-            { title: 'Total Records', amount: summaryStats.totalRecords, color: 'bg-blue-600', icon: Users, isDays: false, isCount: true },
-            { title: 'Total Gross Pay', amount: summaryStats.totalGrossPay, color: 'bg-blue-600', icon: DollarSign },
-            { title: 'Total Deductions', amount: summaryStats.totalDeductions, color: 'bg-blue-600', icon: Calculator },
-            { title: 'Total Net Pay', amount: summaryStats.totalNetPay, color: 'bg-blue-600', icon: CreditCard }
+            { title: 'Total Records', amount: summaryStats.totalRecords, color: 'bg-primary', icon: Users, isDays: false, isCount: true },
+            { title: 'Total Gross Pay', amount: summaryStats.totalGrossPay, color: 'bg-primary', icon: DollarSign },
+            { title: 'Total Deductions', amount: summaryStats.totalDeductions, color: 'bg-primary', icon: Calculator },
+            { title: 'Total Net Pay', amount: summaryStats.totalNetPay, color: 'bg-primary', icon: CreditCard }
           ].map((stat, index) => {
             const Icon = stat.icon
             return (
@@ -1673,7 +1418,7 @@ const WorkersPayroll = () => {
                           {stat.isCount ? `${Number(stat.amount) || 0}` : `₱${(Number(stat.amount) || 0).toFixed(2)}`}
                         </p>
                       </div>
-                      <div className={`p-3 rounded-lg ${stat.color}`}>
+                      <div className={`p-3 rounded-lg bg-gradient-to-r ${stat.color}`}>
                         <Icon className="h-6 w-6 text-white" />
                       </div>
                     </div>
@@ -1705,17 +1450,17 @@ const WorkersPayroll = () => {
                 </div>
                 
                 <CustomDropdown
-                  value={statusFilter}
-                  onChange={setStatusFilter}
+                  value={selectedStatus}
+                  onChange={setSelectedStatus}
                   options={statusOptions}
-                  placeholder="All Status"
+                  placeholder="Select Status"
                 />
 
                 <CustomDropdown
-                  value={departmentFilter}
-                  onChange={setDepartmentFilter}
+                  value={selectedDepartment}
+                  onChange={setSelectedDepartment}
                   options={departmentOptions}
-                  placeholder="All Departments"
+                  placeholder="Select Department"
                 />
               </div>
             </CardContent>
@@ -1751,102 +1496,11 @@ const WorkersPayroll = () => {
                     className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"
                   >
                     {filteredRecords.map((record, index) => (
-                      <motion.div
+                      <PayrollCard
                         key={record.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}
-                        whileHover={{ scale: 1.01 }}
-                        className="group"
-                      >
-                        <Card className="bg-white border-gray-200 hover:border-blue-500 transition-all duration-300 shadow-md">
-                          <CardContent className="p-6">
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-1">{record.employee_name}</h3>
-                                <p className="text-sm text-gray-700 mb-1">{record.position}</p>
-                                <p className="text-xs text-gray-500">{record.employee_code} • {record.payroll_type}</p>
-                              </div>
-                              <StatusBadge status={record.status} />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                              <div className="space-y-2">
-                                <div className="text-sm">
-                                  <span className="text-gray-600">Pay Period:</span>
-                                  <p className="text-gray-900 text-xs">{record.pay_period_start} to {record.pay_period_end}</p>
-                                </div>
-                                <div className="text-sm">
-                                  <span className="text-gray-600">Working Days:</span>
-                                  <p className="text-gray-900">{record.working_days}</p>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <div className="text-sm">
-                                  <span className="text-gray-600">Overtime:</span>
-                                  <p className="text-gray-900">{record.overtime_hours}h</p>
-                                </div>
-                                <div className="text-sm">
-                                  <span className="text-gray-600">Late:</span>
-                                  <p className="text-gray-900">{record.late_minutes} mins</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                              <div className="grid grid-cols-3 gap-4 text-center">
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">Gross Pay</p>
-                                  <p className="text-lg font-semibold text-blue-600">₱{(parseFloat(record.gross_pay) || 0).toFixed(2)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">Deductions</p>
-                                  <p className="text-lg font-semibold text-red-600">-₱{(parseFloat(record.total_deductions) || 0).toFixed(2)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">Net Pay</p>
-                                  <p className="text-lg font-semibold text-green-600">₱{(parseFloat(record.net_pay) || 0).toFixed(2)}</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              <div className="flex space-x-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedRecord(record)
-                                    setShowAttendanceModal(true)
-                                  }}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedRecord(record)
-                                    setShowUpdateModal(true)
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedRecord(record)
-                                    setShowDeleteModal(true)
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
+                        record={record}
+                        index={index}
+                      />
                     ))}
                   </motion.div>
                 ) : (
@@ -1882,37 +1536,36 @@ const WorkersPayroll = () => {
                           >
                             <td className="py-3 px-4">
                               <div>
-                                <p className="text-sm font-medium text-gray-900">{record.employee_name}</p>
-                                <p className="text-xs text-gray-500">{record.employee_code} • {record.position}</p>
+                                <p className="text-sm font-medium text-gray-900">{record.name}</p>
+                                <p className="text-xs text-gray-500">{record.employeeId} • {record.position}</p>
                               </div>
                             </td>
                             <td className="py-3 px-4">
                               <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                record.payroll_type === 'Site' 
+                                record.department === 'Site' 
                                   ? 'bg-blue-100 text-blue-800' 
                                   : 'bg-green-100 text-green-800'
                               }`}>
-                                {record.payroll_type}
+                                {record.department}
                               </span>
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-900">{record.pay_period_start} to {record.pay_period_end}</td>
-                            <td className="py-3 px-4 text-sm text-gray-900 text-right">₱{(parseFloat(record.gross_pay) || 0).toFixed(2)}</td>
+                            <td className="py-3 px-4 text-sm text-gray-900">{record.payPeriod}</td>
+                            <td className="py-3 px-4 text-sm text-gray-900 text-right">₱{record.grossPay.toFixed(2)}</td>
                             <td className="py-3 px-4 text-sm text-red-600 text-right">
-                              ₱{(parseFloat(record.total_deductions) || 0).toFixed(2)}
+                              ₱{(record.deductions.late + record.deductions.cashAdvance + record.deductions.others).toFixed(2)}
                             </td>
-                            <td className="py-3 px-4 text-sm font-medium text-green-600 text-right">₱{(parseFloat(record.net_pay) || 0).toFixed(2)}</td>
+                            <td className="py-3 px-4 text-sm font-medium text-green-600 text-right">₱{record.netPay.toFixed(2)}</td>
                             <td className="py-3 px-4 text-center">
-                              <StatusBadge status={record.status} />
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(record.status)}`}>
+                                {record.status}
+                              </span>
                             </td>
                             <td className="py-3 px-4">
                               <div className="flex items-center justify-center space-x-2">
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => {
-                                    setSelectedRecord(record)
-                                    setShowAttendanceModal(true)
-                                  }}
+                                  onClick={() => handleViewAttendance(record)}
                                   className="text-blue-600 hover:text-blue-800"
                                 >
                                   <Eye className="h-4 w-4" />
@@ -1920,10 +1573,6 @@ const WorkersPayroll = () => {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => {
-                                    setSelectedRecord(record)
-                                    setShowUpdateModal(true)
-                                  }}
                                   className="text-gray-600 hover:text-gray-800"
                                 >
                                   <Edit className="h-4 w-4" />
@@ -1931,10 +1580,6 @@ const WorkersPayroll = () => {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => {
-                                    setSelectedRecord(record)
-                                    setShowDeleteModal(true)
-                                  }}
                                   className="text-red-600 hover:text-red-800"
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -1955,39 +1600,23 @@ const WorkersPayroll = () => {
 
       {/* Modals */}
       <ProcessPayrollModal
-        isOpen={showProcessModal}
-        onClose={() => setShowProcessModal(false)}
-        onSubmit={handlePayrollSubmit}
+        isOpen={isProcessModalOpen}
+        onClose={() => setIsProcessModalOpen(false)}
+        onSubmit={handleProcessPayroll}
         isSubmitting={isSubmitting}
       />
 
       <AttendanceDetailModal
-        isOpen={showAttendanceModal}
-        onClose={() => setShowAttendanceModal(false)}
+        isOpen={isAttendanceModalOpen}
+        onClose={() => setIsAttendanceModalOpen(false)}
         record={selectedRecord}
-      />
-
-      <UpdatePayrollModal
-        isOpen={showUpdateModal}
-        onClose={() => setShowUpdateModal(false)}
-        record={selectedRecord}
-        onUpdate={handleUpdateRecord}
-        isUpdating={isUpdating}
-      />
-
-      <DeleteConfirmationModal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={handleDeleteRecord}
-        record={selectedRecord}
-        isDeleting={isDeleting}
       />
 
       {/* Success Alert */}
       <SuccessAlert
-        message={successMessage}
-        isVisible={showSuccessAlert}
-        onClose={() => setShowSuccessAlert(false)}
+        message={successAlert.message}
+        isVisible={successAlert.isVisible}
+        onClose={() => setSuccessAlert({ isVisible: false, message: '' })}
       />
     </div>
   )

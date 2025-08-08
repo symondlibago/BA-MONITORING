@@ -7,7 +7,8 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\PayrollController;
-use App\Http\Controllers\EmployeeCashAdvanceController;
+use App\Http\Controllers\EmergencyCashAdvanceController;
+use App\Http\Controllers\EmergencyDeductionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -49,9 +50,15 @@ Route::middleware("api")->group(function () {
     // New route for attendance details
     Route::get("payrolls/{id}/attendance", [PayrollController::class, "getAttendanceDetails"]);
     
-    // Employee Cash Advance routes
-    Route::get("cash-advances", [EmployeeCashAdvanceController::class, "index"]);
-    Route::get("cash-advances/employee/{employeeId}", [EmployeeCashAdvanceController::class, "getByEmployee"]);
-    Route::post("cash-advances", [EmployeeCashAdvanceController::class, "store"]);
-    Route::post("cash-advances/update-balance", [EmployeeCashAdvanceController::class, "updateBalance"]);
+    // New route for getting employee ECA/ED data
+    Route::get("employees/{employeeId}/eca-ed", [PayrollController::class, "getEmployeeEcaEd"]);
+    
+    // Emergency Cash Advance routes
+    Route::apiResource("emergency-cash-advances", EmergencyCashAdvanceController::class);
+    Route::get("employees/{employeeId}/eca-ed-details", [EmergencyCashAdvanceController::class, "getByEmployee"]);
+    
+    // Emergency Deduction routes
+    Route::apiResource("emergency-deductions", EmergencyDeductionController::class);
+    
 });
+
