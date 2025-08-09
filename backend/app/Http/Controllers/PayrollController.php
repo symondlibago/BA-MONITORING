@@ -231,6 +231,7 @@ class PayrollController extends Controller
             $payrollData = [
                 'employee_id' => $request->employee_id,
                 'employee_name' => $employee->name,
+                'employee_group' => $employee->group,
                 'employee_code' => $employee->employee_id,
                 'position' => $employee->position,
                 'payroll_type' => $request->payroll_type,
@@ -479,6 +480,7 @@ class PayrollController extends Controller
                     'employee_info' => [
                         'id' => $payroll->employee_id,
                         'name' => $payroll->employee_name,
+                        'group' => $payroll->employee_group,
                         'employee_id' => $payroll->employee_code,
                         'position' => $payroll->position,
                         'department' => $payroll->payroll_type, // Using payroll_type as department

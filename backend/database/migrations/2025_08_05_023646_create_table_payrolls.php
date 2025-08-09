@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger("employee_id");
             $table->string("employee_name");
+            $table->string("employee_group");
             $table->string("employee_code");
             $table->string("position");
             $table->enum("payroll_type", ["Site", "Office"]);

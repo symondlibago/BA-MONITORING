@@ -19,6 +19,7 @@ return new class extends Migration
             $table->integer('age');
             $table->string('phone_number');
             $table->text('address');
+            $table->text('group');
             $table->integer('year_started');
             $table->enum('status', ['Site', 'Office']);
             $table->decimal('rate', 10, 2); // Daily rate

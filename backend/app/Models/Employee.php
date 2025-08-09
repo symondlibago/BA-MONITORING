@@ -21,6 +21,7 @@ class Employee extends Model
         'age',
         'phone_number',
         'address',
+        'group',
         'year_started',
         'status',
         'rate',

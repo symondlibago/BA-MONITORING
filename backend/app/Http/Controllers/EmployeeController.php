@@ -42,6 +42,7 @@ class EmployeeController extends Controller
             'age' => 'required|integer|min:18|max:100',
             'phone_number' => 'required|string|max:20',
             'address' => 'required|string|max:500',
+            'group' => 'required|string|max:500',
             'year_started' => 'required|integer|min:1900|max:' . date('Y'),
             'status' => 'required|in:Site,Office',
             'rate' => 'required|numeric|min:0'
@@ -69,6 +70,7 @@ class EmployeeController extends Controller
                 'age' => $request->age,
                 'phone_number' => $request->phone_number,
                 'address' => $request->address,
+                'group' => $request->group,
                 'year_started' => $request->year_started,
                 'status' => $request->status,
                 'rate' => $request->rate,
@@ -133,6 +135,7 @@ class EmployeeController extends Controller
             'age' => 'required|integer|min:18|max:100',
             'phone_number' => 'required|string|max:20',
             'address' => 'required|string|max:500',
+            'group' => 'required|string|max:500',
             'year_started' => 'required|integer|min:1900|max:' . date('Y'),
             'status' => 'required|in:Site,Office',
             'rate' => 'required|numeric|min:0'
@@ -172,6 +175,7 @@ class EmployeeController extends Controller
                 'age' => $request->age,
                 'phone_number' => $request->phone_number,
                 'address' => $request->address,
+                'group' => $request->group,
                 'year_started' => $request->year_started,
                 'status' => $request->status,
                 'rate' => $request->rate,

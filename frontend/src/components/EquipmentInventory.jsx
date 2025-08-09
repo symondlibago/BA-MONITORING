@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Search, Plus, Package, CheckCircle, AlertCircle, Settings, Edit, Trash2, 
-  User, Calendar, Wrench, Grid3X3, List, MapPin, ChevronRight, ShoppingCart, 
+  Plus, Package, CheckCircle, AlertCircle, Settings, Edit, Trash2, 
+  User, Calendar, Grid3X3, List, MapPin, ChevronRight, ShoppingCart, 
   X, Loader2, Save, ChevronDown
 } from 'lucide-react'
 import { Button } from '@/components/ui/button.jsx'
-import { Input } from '@/components/ui/input.jsx'
 import { Card, CardContent } from '@/components/ui/card.jsx'
 
 // Custom Dropdown Component

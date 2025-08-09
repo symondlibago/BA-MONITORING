@@ -220,6 +220,7 @@ const AddEmployeeModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting }
     age: '',
     phone_number: '',
     address: '',
+    group: '',
     year_started: '',
     status: 'Site',
     rate: ''
@@ -236,6 +237,7 @@ const AddEmployeeModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting }
         age: '',
         phone_number: '',
         address: '',
+        group: '',
         year_started: '',
         status: 'Site',
         rate: ''
@@ -366,6 +368,20 @@ const AddEmployeeModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting }
                   disabled={isSubmitting}
                 />
               </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Group <span className="text-red-500">*</span>
+                </label>
+                <input
+                  value={formData.group}
+                  onChange={(e) => handleInputChange('group', e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                  placeholder="Enter Group"
+                  rows="3"
+                  disabled={isSubmitting}
+                />
+              </div>
 
               {/* Row 4: Year Started & Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -435,7 +451,7 @@ const AddEmployeeModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting }
               <Button
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
                 onClick={handleSubmit}
-                disabled={!formData.name || !formData.position || !formData.age || !formData.phone_number || !formData.address || !formData.year_started || !formData.rate || isSubmitting}
+                disabled={!formData.name || !formData.position || !formData.age || !formData.phone_number || !formData.address ||!formData.group || !formData.year_started || !formData.rate || isSubmitting}
               >
                 {isSubmitting ? (
                   <>
@@ -462,6 +478,7 @@ const EditEmployeeModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting,
     age: '',
     phone_number: '',
     address: '',
+    group: '',
     year_started: '',
     status: 'Site',
     rate: ''
@@ -478,6 +495,7 @@ const EditEmployeeModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting,
         age: employee.age || '',
         phone_number: employee.phone_number || '',
         address: employee.address || '',
+        group: employee.group || '',
         year_started: employee.year_started || '',
         status: employee.status || 'Site',
         rate: employee.rate || ''
@@ -608,6 +626,19 @@ const EditEmployeeModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting,
                   disabled={isSubmitting}
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Group <span className="text-red-500">*</span>
+                </label>
+                <input
+                  value={formData.group}
+                  onChange={(e) => handleInputChange('group', e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                  placeholder="Enter Group"
+                  rows="3"
+                  disabled={isSubmitting}
+                />
+              </div>
 
               {/* Row 4: Year Started & Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -677,7 +708,7 @@ const EditEmployeeModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting,
               <Button
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
                 onClick={handleSubmit}
-                disabled={!formData.name || !formData.position || !formData.age || !formData.phone_number || !formData.address || !formData.year_started || !formData.rate || isSubmitting}
+                disabled={!formData.name || !formData.position || !formData.age || !formData.phone_number || !formData.address ||!formData.group || !formData.year_started || !formData.rate || isSubmitting}
               >
                 {isSubmitting ? (
                   <>
@@ -700,6 +731,7 @@ const Employee = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [positionFilter, setPositionFilter] = useState('All')
+  const [groupFilter, setGroupFilter] = useState('All')
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -853,12 +885,14 @@ const Employee = () => {
   const filteredEmployees = employees.filter(employee => {
     const matchesSearch = employee.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          employee.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         employee.group?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          employee.employee_id?.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesStatus = statusFilter === 'All' || employee.status === statusFilter
     const matchesPosition = positionFilter === 'All' || employee.position === positionFilter
+    const matchesGroup = groupFilter === 'All' || employee.group === groupFilter
     
-    return matchesSearch && matchesStatus && matchesPosition
+    return matchesSearch && matchesStatus && matchesPosition && matchesGroup
   })
 
   // Calculate statistics
@@ -868,6 +902,7 @@ const Employee = () => {
 
   // Get unique values for filters
   const positions = [...new Set(employees.map(emp => emp.position).filter(Boolean))]
+  const group = [...new Set(employees.map(emp => emp.group).filter(Boolean))]
 
   // Dropdown options
   const statusOptions = [
@@ -879,6 +914,10 @@ const Employee = () => {
   const positionOptions = [
     { value: 'All', label: 'All Positions' },
     ...positions.map(position => ({ value: position, label: position }))
+  ]
+  const groupOptions = [
+    { value: 'All', label: 'All Group' },
+    ...group.map(group => ({ value: group, label: group }))
   ]
 
   const getStatusColor = (status) => {
@@ -989,39 +1028,54 @@ const Employee = () => {
 
       {/* Search and Filters */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="bg-white border-[var(--color-border)] rounded-lg p-6 shadow-md"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="lg:col-span-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-foreground)]/70 h-4 w-4" />
-              <Input
-                placeholder="Search employees, positions, or IDs..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-[var(--color-input)] border-[var(--color-border)] text-[var(--color-foreground)] placeholder-[var(--color-foreground)]/50"
-              />
-            </div>
-          </div>
-          
-          <CustomDropdown
-            value={statusFilter}
-            onChange={setStatusFilter}
-            options={statusOptions}
-            placeholder="All Status"
-          />
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.2 }}
+  className="bg-white border-[var(--color-border)] rounded-lg p-6 shadow-md"
+>
+  <div className="flex flex-wrap gap-4 items-center">
+    <div className="flex-1 min-w-[200px]">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-foreground)]/70 h-4 w-4" />
+        <Input
+          placeholder="Search employees, positions, or IDs..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 bg-[var(--color-input)] border-[var(--color-border)] text-[var(--color-foreground)] placeholder-[var(--color-foreground)]/50"
+        />
+      </div>
+    </div>
 
-          <CustomDropdown
-            value={positionFilter}
-            onChange={setPositionFilter}
-            options={positionOptions}
-            placeholder="All Positions"
-          />
-        </div>
-      </motion.div>
+    <div className="w-[150px]">
+      <CustomDropdown
+        value={statusFilter}
+        onChange={setStatusFilter}
+        options={statusOptions}
+        placeholder="All Status"
+      />
+    </div>
+
+    <div className="w-[150px]">
+      <CustomDropdown
+        value={positionFilter}
+        onChange={setPositionFilter}
+        options={positionOptions}
+        placeholder="All Positions"
+      />
+    </div>
+
+    <div className="w-[150px]">
+      <CustomDropdown
+        value={groupFilter}
+        onChange={setGroupFilter}
+        options={groupOptions}
+        placeholder="All Groups"
+      />
+    </div>
+  </div>
+</motion.div>
+
+
 
       {/* Employee Grid */}
       <motion.div
@@ -1083,6 +1137,11 @@ const Employee = () => {
                     <span className="text-[var(--color-foreground)]/70">
                       Daily: ₱{parseFloat(employee.rate || 0).toFixed(2)} • Hourly: ₱{parseFloat(employee.hourly_rate || 0).toFixed(2)}
                     </span>
+                  </div>
+
+                  <div className="flex items-start space-x-2 text-sm">
+                    <MapPin className="h-4 w-4 text-[var(--color-primary)] mt-0.5" />
+                    <span className="text-[var(--color-foreground)]/70 line-clamp-2">{employee.group}</span>
                   </div>
                 </div>
 

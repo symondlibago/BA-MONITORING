@@ -5,12 +5,7 @@ import {
   Plus, 
   DollarSign, 
   Users, 
-  Calendar, 
   Clock,
-  TrendingUp,
-  TrendingDown,
-  Filter,
-  Download,
   Eye,
   Edit,
   Trash2,
@@ -1373,6 +1368,7 @@ const WorkersPayroll = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [departmentFilter, setDepartmentFilter] = useState('all')
+  const [groupFilter, setGroupFilter] = useState('All')
   const [viewMode, setViewMode] = useState('card')
   const [showProcessModal, setShowProcessModal] = useState(false)
   const [showAttendanceModal, setShowAttendanceModal] = useState(false)
@@ -1506,26 +1502,31 @@ const WorkersPayroll = () => {
     }
   }, [selectedRecord, fetchPayrollRecords])
 
-  // Filter and search records
   const filteredRecords = useMemo(() => {
-    return payrollRecords.filter(record => {
-      const matchesSearch = record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           record.employee_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           record.position?.toLowerCase().includes(searchTerm.toLowerCase())
-      
-      const matchesStatus = statusFilter === 'all' || record.status === statusFilter
-      const matchesDepartment = departmentFilter === 'all' || record.payroll_type === departmentFilter
-      
-      return matchesSearch && matchesStatus && matchesDepartment
-    })
-  }, [payrollRecords, searchTerm, statusFilter, departmentFilter])
+  const lowercasedSearchTerm = searchTerm.toLowerCase();
 
-  // Calculate summary statistics
+  return payrollRecords.filter(record => {
+    const matchesSearch = searchTerm.trim() === '' ? true : (
+         (record.employee_name || '').toLowerCase().includes(lowercasedSearchTerm) ||
+         (record.employee_code || '').toLowerCase().includes(lowercasedSearchTerm) ||
+         (record.position || '').toLowerCase().includes(lowercasedSearchTerm) ||
+         (record.pay_period_start || '').toLowerCase().includes(lowercasedSearchTerm) ||
+         (record.pay_period_end || '').toLowerCase().includes(lowercasedSearchTerm)
+    );
+    
+    const matchesStatus = statusFilter === 'all' || record.status === statusFilter;
+    const matchesDepartment = departmentFilter === 'all' || record.payroll_type === departmentFilter;
+    const matchesGroup = groupFilter === 'all' || record.employee_group === groupFilter;
+    
+    return matchesSearch && matchesStatus && matchesDepartment && matchesGroup;
+  });
+}, [payrollRecords, searchTerm, statusFilter, departmentFilter, groupFilter]);
+
   const summaryStats = useMemo(() => {
-    const totalRecords = payrollRecords.length
-    const totalGrossPay = payrollRecords.reduce((sum, record) => sum + parseFloat(record.gross_pay || 0), 0)
-    const totalDeductions = payrollRecords.reduce((sum, record) => sum + parseFloat(record.total_deductions || 0), 0)
-    const totalNetPay = payrollRecords.reduce((sum, record) => sum + parseFloat(record.net_pay || 0), 0)
+    const totalRecords = filteredRecords.length;
+    const totalGrossPay = filteredRecords.reduce((sum, record) => sum + parseFloat(record.gross_pay || 0), 0); 
+    const totalDeductions = filteredRecords.reduce((sum, record) => sum + parseFloat(record.total_deductions || 0), 0); 
+    const totalNetPay = filteredRecords.reduce((sum, record) => sum + parseFloat(record.net_pay || 0), 0); 
     
     return {
       totalRecords,
@@ -1533,7 +1534,10 @@ const WorkersPayroll = () => {
       totalDeductions,
       totalNetPay
     }
-  }, [payrollRecords])
+  }, [filteredRecords]);
+
+  const groups = [...new Set(payrollRecords.map(record => record.employee_group).filter(Boolean))]
+
 
   // Status options for dropdown
   const statusOptions = [
@@ -1549,6 +1553,10 @@ const WorkersPayroll = () => {
     { value: 'all', label: 'All Departments' },
     { value: 'Site', label: 'Site' },
     { value: 'Office', label: 'Office' }
+  ]
+  const groupOptions = [
+    { value: 'all', label: 'All Groups' },
+    ...groups.map(group => ({ value: group, label: group }))
   ]
 
   // Status badge component
@@ -1686,41 +1694,59 @@ const WorkersPayroll = () => {
 
         {/* Filters and Search */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <Card className="bg-white border-gray-200 shadow-md">
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="relative col-span-2">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600 h-4 w-4" />
-                  <input
-                    type="text"
-                    placeholder="Search payroll records..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-                
-                <CustomDropdown
-                  value={statusFilter}
-                  onChange={setStatusFilter}
-                  options={statusOptions}
-                  placeholder="All Status"
-                />
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.5, delay: 0.3 }}
+>
+  <Card className="bg-white border-gray-200 shadow-md">
+    <CardContent className="p-6">
+      <div className="flex flex-wrap gap-4 items-center">
+        {/* Search */}
+        <div className="flex-1 min-w-[200px] relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600 h-4 w-4" />
+          <input
+            type="text"
+            placeholder="Search payroll records..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+          />
+        </div>
 
-                <CustomDropdown
-                  value={departmentFilter}
-                  onChange={setDepartmentFilter}
-                  options={departmentOptions}
-                  placeholder="All Departments"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {/* Status Filter */}
+        <div className="w-[160px]">
+          <CustomDropdown
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={statusOptions}
+            placeholder="All Status"
+          />
+        </div>
+
+        {/* Department Filter (now fixed width) */}
+        <div className="w-[190px]">
+          <CustomDropdown
+            value={departmentFilter}
+            onChange={setDepartmentFilter}
+            options={departmentOptions}
+            placeholder="All Departments"
+          />
+        </div>
+
+        {/* Group Filter */}
+        <div className="w-[160px]">
+        <CustomDropdown
+                    value={groupFilter}
+                    onChange={setGroupFilter}
+                    options={groupOptions}
+                    placeholder="All Groups"
+                  />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+</motion.div>
+
 
         {/* Payroll Records with Smooth View Transitions */}
         <Card>
@@ -1861,6 +1887,7 @@ const WorkersPayroll = () => {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-gray-200">
+                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Group</th>
                           <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Employee</th>
                           <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Department</th>
                           <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Pay Period</th>
@@ -1880,6 +1907,11 @@ const WorkersPayroll = () => {
                             transition={{ delay: index * 0.05 }}
                             className="border-b border-gray-100 hover:bg-gray-50"
                           >
+                          <td className="py-3 px-4">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{record.employee_group}</p>
+                              </div>
+                            </td>
                             <td className="py-3 px-4">
                               <div>
                                 <p className="text-sm font-medium text-gray-900">{record.employee_name}</p>
