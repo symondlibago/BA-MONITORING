@@ -265,7 +265,7 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
       if (field === 'unitPrice' && prev.quantity) {
         const quantity = parseFloat(prev.quantity.replace(/[^\d.]/g, '')) || 0
         const unitPrice = parseFloat(value) || 0
-        newData.totalPrice = (quantity * unitPrice).toFixed(2)
+        newData.totalPrice = unitPrice.toFixed(2)
       }
       
       return newData

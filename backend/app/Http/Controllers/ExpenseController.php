@@ -61,7 +61,7 @@ class ExpenseController extends Controller
                 'mop_description' => 'nullable|string|max:500', // MOP description
                 'category' => 'nullable|string|max:255',
                 'images' => 'nullable|array|max:10', // Maximum 10 images
-                'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048' // Each image validation
+                'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:20480' // Each image validation
             ]);
 
             // Handle image uploads
@@ -148,7 +148,7 @@ class ExpenseController extends Controller
                 'mop_description' => 'nullable|string|max:500', // MOP description
                 'category' => 'nullable|string|max:255',
                 'images' => 'nullable|array|max:10', // Maximum 10 images
-                'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048' // Each image validation
+                'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:20480' // Each image validation
             ]);
 
             // Handle image uploads

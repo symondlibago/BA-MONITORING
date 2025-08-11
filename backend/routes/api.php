@@ -9,6 +9,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\EmergencyCashAdvanceController;
 use App\Http\Controllers\EmergencyDeductionController;
+use App\Http\Controllers\TaskController;
 
 /*
 |--------------------------------------------------------------------------
@@ -27,6 +28,9 @@ Route::post("/login", [AuthController::class, "login"]);
 
 // Expense routes (public for now, can be protected later)
 Route::apiResource("expenses", ExpenseController::class);
+
+// Task routes
+Route::apiResource("tasks", TaskController::class);
 
 // Protected routes
 Route::middleware("auth:sanctum")->group(function () {

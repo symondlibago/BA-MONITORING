@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, 
@@ -6,7 +6,6 @@ import {
   ClipboardList, 
   Users, 
   Calendar, 
-  Clock,
   MapPin,
   CheckCircle,
   AlertCircle,
@@ -15,143 +14,958 @@ import {
   Edit,
   Trash2,
   Eye,
-  Flag
+  Flag,
+  X,
+  Loader2,
+  ChevronDown
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Button } from '@/components/ui/button.jsx'
+import { Input } from '@/components/ui/input.jsx'
+import API_BASE_URL from './Config'
 
-// Sample data for tasks
-const initialTasks = [
-  {
-    id: 1,
-    name: 'General Cleaning for Today',
-    description: 'Complete cleaning of all office areas including restrooms and common areas',
-    assignedMembers: ['John Doe', 'Jane Smith'],
-    date: '2024-07-24',
-    startTime: '08:00',
-    endTime: '12:00',
-    location: 'Office Building - All Floors',
-    status: 'In Progress',
-    priority: 'High',
-    progress: 65,
-    category: 'Maintenance',
-    estimatedHours: 4,
-    actualHours: 2.6
-  },
-  {
-    id: 2,
-    name: 'Equipment Maintenance Check',
-    description: 'Monthly inspection and maintenance of all power tools and equipment',
-    assignedMembers: ['Mike Johnson', 'Sarah Wilson'],
-    date: '2024-07-24',
-    startTime: '13:00',
-    endTime: '17:00',
-    location: 'Tool Room A & B',
+// Custom Dropdown Component
+const CustomDropdown = React.memo(({ label, required = false, value, onChange, options, placeholder, disabled = false, className = "" }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [selectedOption, setSelectedOption] = useState(null)
+
+  useEffect(() => {
+    const option = options.find(opt => opt.value === value)
+    setSelectedOption(option || null)
+  }, [value, options])
+
+  const handleSelect = useCallback((option) => {
+    setSelectedOption(option)
+    onChange(option.value)
+    setIsOpen(false)
+  }, [onChange])
+
+  return (
+    <div className={`relative ${className}`}>
+      {label && (
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+      )}
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={`w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none text-left flex items-center justify-between ${
+          disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:border-gray-400'
+        }`}
+      >
+        <span className={selectedOption ? 'text-gray-900' : 'text-gray-500'}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <motion.div
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ChevronDown className="h-4 w-4 text-gray-400" />
+        </motion.div>
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg"
+          >
+            <ul className="py-1 text-sm text-gray-700 max-h-60 overflow-y-auto">
+              {options.map((option, index) => (
+                <motion.li
+                  key={option.value}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(option)}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors duration-150"
+                  >
+                    {option.label}
+                  </button>
+                </motion.li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Backdrop to close dropdown */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+    </div>
+  )
+})
+
+// Success Alert Component
+const SuccessAlert = React.memo(({ message, isVisible, onClose }) => {
+  useEffect(() => {
+    if (isVisible) {
+      const timer = setTimeout(() => {
+        onClose()
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [isVisible, onClose])
+
+  if (!isVisible) return null
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: -50, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -50, scale: 0.95 }}
+        className="fixed top-4 right-4 z-50 bg-green-50 border border-green-200 rounded-lg p-4 shadow-lg max-w-md"
+      >
+        <div className="flex items-center">
+          <CheckCircle className="h-5 w-5 text-green-600 mr-3" />
+          <p className="text-green-800 font-medium">{message}</p>
+          <button
+            onClick={onClose}
+            className="ml-auto text-green-600 hover:text-green-800"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  )
+})
+
+// Delete Confirmation Modal
+const DeleteConfirmationModal = React.memo(({ isOpen, onClose, onConfirm, isDeleting, taskName }) => {
+  if (!isOpen) return null
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        onClick={() => !isDeleting && onClose()}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.9, opacity: 0, y: 20 }}
+          className="bg-white rounded-lg shadow-xl max-w-md w-full"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-6">
+            <div className="flex items-center mb-4">
+              <div className="p-3 bg-red-100 rounded-full mr-4">
+                <AlertCircle className="h-6 w-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete Task</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone</p>
+              </div>
+            </div>
+            
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to delete <span className="font-semibold">{taskName}</span>? 
+              This will permanently remove the task from the system.
+            </p>
+
+            <div className="flex space-x-3">
+              <Button 
+                variant="outline" 
+                className="flex-1" 
+                onClick={onClose}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button 
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                onClick={onConfirm}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete Task'
+                )}
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+})
+
+// Multi-select Employee Dropdown
+const MultiSelectEmployeeDropdown = React.memo(({ label, required = false, value, onChange, employees, placeholder, disabled = false, className = "" }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [selectedEmployees, setSelectedEmployees] = useState([])
+
+  useEffect(() => {
+    if (value && Array.isArray(value)) {
+      const selected = employees.filter(emp => value.includes(emp.id))
+      setSelectedEmployees(selected)
+    } else {
+      setSelectedEmployees([])
+    }
+  }, [value, employees])
+
+  const handleToggleEmployee = useCallback((employee) => {
+    const isSelected = selectedEmployees.some(emp => emp.id === employee.id)
+    let newSelected
+    
+    if (isSelected) {
+      newSelected = selectedEmployees.filter(emp => emp.id !== employee.id)
+    } else {
+      newSelected = [...selectedEmployees, employee]
+    }
+    
+    setSelectedEmployees(newSelected)
+    onChange(newSelected.map(emp => emp.id))
+  }, [selectedEmployees, onChange])
+
+  return (
+    <div className={`relative ${className}`}>
+      {label && (
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+      )}
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={`w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none text-left flex items-center justify-between ${
+          disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:border-gray-400'
+        }`}
+      >
+        <span className={selectedEmployees.length > 0 ? 'text-gray-900' : 'text-gray-500'}>
+          {selectedEmployees.length > 0 
+            ? `${selectedEmployees.length} employee(s) selected`
+            : placeholder
+          }
+        </span>
+        <motion.div
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ChevronDown className="h-4 w-4 text-gray-400" />
+        </motion.div>
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg"
+          >
+            <ul className="py-1 text-sm text-gray-700 max-h-60 overflow-y-auto">
+              {employees.map((employee, index) => {
+                const isSelected = selectedEmployees.some(emp => emp.id === employee.id)
+                return (
+                  <motion.li
+                    key={employee.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleToggleEmployee(employee)}
+                      className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors duration-150 flex items-center ${
+                        isSelected ? 'bg-blue-50 text-blue-900' : ''
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}}
+                        className="mr-2"
+                      />
+                      {employee.name} ({employee.employee_id})
+                    </button>
+                  </motion.li>
+                )
+              })}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Backdrop to close dropdown */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+    </div>
+  )
+})
+
+// Add Task Modal
+const AddTaskModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting, employees }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    assigned_employee_ids: [],
+    date: '',
+    location: '',
     status: 'Pending',
     priority: 'Medium',
-    progress: 0,
-    category: 'Maintenance',
-    estimatedHours: 4,
-    actualHours: 0
-  },
-  {
-    id: 3,
-    name: 'Safety Training Session',
-    description: 'Quarterly safety training for all construction workers',
-    assignedMembers: ['David Brown', 'Lisa Garcia', 'Tom Anderson'],
-    date: '2024-07-25',
-    startTime: '09:00',
-    endTime: '11:00',
-    location: 'Conference Room A',
-    status: 'Scheduled',
-    priority: 'High',
-    progress: 0,
-    category: 'Training',
-    estimatedHours: 2,
-    actualHours: 0
-  },
-  {
-    id: 4,
-    name: 'Inventory Count',
-    description: 'Monthly inventory count of all tools and supplies',
-    assignedMembers: ['Anna Martinez', 'Chris Lee'],
-    date: '2024-07-23',
-    startTime: '14:00',
-    endTime: '18:00',
-    location: 'Warehouse',
-    status: 'Completed',
-    priority: 'Medium',
-    progress: 100,
-    category: 'Inventory',
-    estimatedHours: 4,
-    actualHours: 3.5
-  },
-  {
-    id: 5,
-    name: 'Site Inspection',
-    description: 'Weekly site inspection for safety compliance and progress review',
-    assignedMembers: ['Robert Taylor', 'Emily Davis'],
-    date: '2024-07-26',
-    startTime: '10:00',
-    endTime: '14:00',
-    location: 'Construction Site A',
-    status: 'Scheduled',
-    priority: 'High',
-    progress: 0,
-    category: 'Inspection',
-    estimatedHours: 4,
-    actualHours: 0
-  },
-  {
-    id: 6,
-    name: 'Equipment Repair',
-    description: 'Repair broken drill and replace worn parts',
-    assignedMembers: ['Kevin White'],
-    date: '2024-07-24',
-    startTime: '15:00',
-    endTime: '16:30',
-    location: 'Repair Shop',
-    status: 'Overdue',
-    priority: 'High',
-    progress: 25,
-    category: 'Repair',
-    estimatedHours: 1.5,
-    actualHours: 0.5
-  }
-]
+    category: ''
+  })
 
-const statusOptions = ['All', 'Pending', 'In Progress', 'Completed', 'Scheduled', 'Overdue']
-const priorityOptions = ['All', 'Low', 'Medium', 'High', 'Critical']
-const categoryOptions = ['All', 'Maintenance', 'Training', 'Inventory', 'Inspection', 'Repair']
+  // Reset form when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        name: '',
+        description: '',
+        assigned_employee_ids: [],
+        date: '',
+        location: '',
+        status: 'Pending',
+        priority: 'Medium',
+        category: ''
+      })
+    }
+  }, [isOpen])
+
+  const handleInputChange = useCallback((field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }, [])
+
+  const handleSubmit = useCallback(() => {
+    onSubmit(formData)
+  }, [formData, onSubmit])
+
+  const statusOptions = [
+    { value: 'Pending', label: 'Pending' },
+    { value: 'In Progress', label: 'In Progress' },
+    { value: 'Completed', label: 'Completed' },
+    { value: 'Scheduled', label: 'Scheduled' },
+    { value: 'Overdue', label: 'Overdue' }
+  ]
+
+  const priorityOptions = [
+    { value: 'Low', label: 'Low' },
+    { value: 'Medium', label: 'Medium' },
+    { value: 'High', label: 'High' },
+    { value: 'Critical', label: 'Critical' }
+  ]
+
+  if (!isOpen) return null
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        onClick={() => !isSubmitting && onClose()}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.9, opacity: 0, y: 20 }}
+          className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Create New Task</h2>
+              <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Row 1: Name & Category */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Task Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                    placeholder="Enter task name"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.category}
+                    onChange={(e) => handleInputChange('category', e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                    placeholder="Enter category"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                  placeholder="Enter task description"
+                  rows="3"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              {/* Row 3: Assigned Employees */}
+              <MultiSelectEmployeeDropdown
+                label="Assigned Employees"
+                required={true}
+                value={formData.assigned_employee_ids}
+                onChange={(value) => handleInputChange('assigned_employee_ids', value)}
+                employees={employees}
+                placeholder="Select employees"
+                disabled={isSubmitting}
+              />
+
+              {/* Row 4: Date & Location */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => handleInputChange('date', e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Location <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.location}
+                    onChange={(e) => handleInputChange('location', e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                    placeholder="Enter location"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+
+              {/* Row 5: Status & Priority */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <CustomDropdown
+                  label="Status"
+                  required={true}
+                  value={formData.status}
+                  onChange={(value) => handleInputChange('status', value)}
+                  options={statusOptions}
+                  placeholder="Select status"
+                  disabled={isSubmitting}
+                />
+                <CustomDropdown
+                  label="Priority"
+                  required={true}
+                  value={formData.priority}
+                  onChange={(value) => handleInputChange('priority', value)}
+                  options={priorityOptions}
+                  placeholder="Select priority"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6 pt-6 border-t">
+              <Button variant="outline" className="flex-1" onClick={onClose} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                onClick={handleSubmit}
+                disabled={!formData.name || !formData.description || !formData.category || formData.assigned_employee_ids.length === 0 || !formData.date || !formData.location || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Task'
+                )}
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+})
+
+// Edit Task Modal
+const EditTaskModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting, task, employees }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    assigned_employee_ids: [],
+    date: '',
+    location: '',
+    status: 'Pending',
+    priority: 'Medium',
+    category: ''
+  })
+
+  // Populate form when modal opens with task data
+  useEffect(() => {
+    if (isOpen && task) {
+      setFormData({
+        name: task.name || '',
+        description: task.description || '',
+        assigned_employee_ids: task.assigned_employee_ids ? JSON.parse(task.assigned_employee_ids) : [],
+        date: task.date || '',
+        location: task.location || '',
+        status: task.status || 'Pending',
+        priority: task.priority || 'Medium',
+        category: task.category || ''
+      })
+    }
+  }, [isOpen, task])
+
+  const handleInputChange = useCallback((field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }, [])
+
+  const handleSubmit = useCallback(() => {
+    const submitData = { ...formData, id: task.id }
+    onSubmit(submitData)
+  }, [formData, onSubmit, task])
+
+  const statusOptions = [
+    { value: 'Pending', label: 'Pending' },
+    { value: 'In Progress', label: 'In Progress' },
+    { value: 'Completed', label: 'Completed' },
+    { value: 'Scheduled', label: 'Scheduled' },
+    { value: 'Overdue', label: 'Overdue' }
+  ]
+
+  const priorityOptions = [
+    { value: 'Low', label: 'Low' },
+    { value: 'Medium', label: 'Medium' },
+    { value: 'High', label: 'High' },
+    { value: 'Critical', label: 'Critical' }
+  ]
+
+  if (!isOpen || !task) return null
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        onClick={() => !isSubmitting && onClose()}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.9, opacity: 0, y: 20 }}
+          className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Edit Task</h2>
+              <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Row 1: Name & Category */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Task Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                    placeholder="Enter task name"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.category}
+                    onChange={(e) => handleInputChange('category', e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                    placeholder="Enter category"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                  placeholder="Enter task description"
+                  rows="3"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              {/* Row 3: Assigned Employees */}
+              <MultiSelectEmployeeDropdown
+                label="Assigned Employees"
+                required={true}
+                value={formData.assigned_employee_ids}
+                onChange={(value) => handleInputChange('assigned_employee_ids', value)}
+                employees={employees}
+                placeholder="Select employees"
+                disabled={isSubmitting}
+              />
+
+              {/* Row 4: Date & Location */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => handleInputChange('date', e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Location <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.location}
+                    onChange={(e) => handleInputChange('location', e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                    placeholder="Enter location"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+
+              {/* Row 5: Status & Priority */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <CustomDropdown
+                  label="Status"
+                  required={true}
+                  value={formData.status}
+                  onChange={(value) => handleInputChange('status', value)}
+                  options={statusOptions}
+                  placeholder="Select status"
+                  disabled={isSubmitting}
+                />
+                <CustomDropdown
+                  label="Priority"
+                  required={true}
+                  value={formData.priority}
+                  onChange={(value) => handleInputChange('priority', value)}
+                  options={priorityOptions}
+                  placeholder="Select priority"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6 pt-6 border-t">
+              <Button variant="outline" className="flex-1" onClick={onClose} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                onClick={handleSubmit}
+                disabled={!formData.name || !formData.description || !formData.category || formData.assigned_employee_ids.length === 0 || !formData.date || !formData.location || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Task'
+                )}
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+})
 
 function TaskMonitoring() {
-  const [tasks, setTasks] = useState(initialTasks)
+  const [tasks, setTasks] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('All')
   const [selectedPriority, setSelectedPriority] = useState('All')
   const [selectedCategory, setSelectedCategory] = useState('All')
-  const [showAddForm, setShowAddForm] = useState(false)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [selectedTask, setSelectedTask] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [successAlert, setSuccessAlert] = useState({ isVisible: false, message: '' })
+
+  // Fetch tasks from backend
+  const fetchTasks = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`${API_BASE_URL}/tasks`)
+      const data = await response.json()
+      
+      if (data.success) {
+        setTasks(data.data)
+      } else {
+        console.error('Failed to fetch tasks:', data.message)
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Fetch employees from backend
+  const fetchEmployees = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/employees`)
+      const data = await response.json()
+      
+      if (data.success) {
+        setEmployees(data.data)
+      } else {
+        console.error('Failed to fetch employees:', data.message)
+      }
+    } catch (error) {
+      console.error('Error fetching employees:', error)
+    }
+  }, [])
+
+  // Load tasks and employees on component mount
+  useEffect(() => {
+    fetchTasks()
+    fetchEmployees()
+  }, [fetchTasks, fetchEmployees])
+
+  // Add new task
+  const handleAddTask = useCallback(async (formData) => {
+    try {
+      setIsSubmitting(true)
+      const response = await fetch(`${API_BASE_URL}/tasks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        setTasks(prev => [data.data, ...prev])
+        setIsAddModalOpen(false)
+        setSuccessAlert({
+          isVisible: true,
+          message: 'Task created successfully!'
+        })
+      } else {
+        console.error('Failed to create task:', data.message)
+        alert('Failed to create task. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error creating task:', error)
+      alert('Error creating task. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [])
+
+  // Edit task
+  const handleEditTask = useCallback(async (formData) => {
+    try {
+      setIsSubmitting(true)
+      const response = await fetch(`${API_BASE_URL}/tasks/${formData.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        setTasks(prev => prev.map(task => 
+          task.id === formData.id ? data.data : task
+        ))
+        setIsEditModalOpen(false)
+        setSelectedTask(null)
+        setSuccessAlert({
+          isVisible: true,
+          message: 'Task updated successfully!'
+        })
+      } else {
+        console.error('Failed to update task:', data.message)
+        alert('Failed to update task. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error updating task:', error)
+      alert('Error updating task. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [])
+
+  // Delete task
+  const handleDeleteTask = useCallback(async () => {
+    if (!selectedTask) return
+
+    try {
+      setIsDeleting(true)
+      const response = await fetch(`${API_BASE_URL}/tasks/${selectedTask.id}`, {
+        method: 'DELETE'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        setTasks(prev => prev.filter(task => task.id !== selectedTask.id))
+        setIsDeleteModalOpen(false)
+        setSelectedTask(null)
+        setSuccessAlert({
+          isVisible: true,
+          message: 'Task deleted successfully!'
+        })
+      } else {
+        console.error('Failed to delete task:', data.message)
+        alert('Failed to delete task. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error)
+      alert('Error deleting task. Please try again.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }, [selectedTask])
+
+  // Open edit modal
+  const openEditModal = useCallback((task) => {
+    setSelectedTask(task)
+    setIsEditModalOpen(true)
+  }, [])
+
+  // Open delete modal
+  const openDeleteModal = useCallback((task) => {
+    setSelectedTask(task)
+    setIsDeleteModalOpen(true)
+  }, [])
 
   // Filter tasks based on search term, status, priority, and category
-  const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
-      const matchesSearch = task.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           task.assignedMembers.some(member => member.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                           task.location.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesStatus = selectedStatus === 'All' || task.status === selectedStatus
-      const matchesPriority = selectedPriority === 'All' || task.priority === selectedPriority
-      const matchesCategory = selectedCategory === 'All' || task.category === selectedCategory
-      
-      return matchesSearch && matchesStatus && matchesPriority && matchesCategory
-    })
-  }, [tasks, searchTerm, selectedStatus, selectedPriority, selectedCategory])
+  const filteredTasks = tasks.filter(task => {
+    const matchesSearch = task.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         task.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         task.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         task.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (task.assigned_employees && task.assigned_employees.some(emp => 
+                           emp.name?.toLowerCase().includes(searchTerm.toLowerCase())
+                         ))
+    
+    const matchesStatus = selectedStatus === 'All' || task.status === selectedStatus
+    const matchesPriority = selectedPriority === 'All' || task.priority === selectedPriority
+    const matchesCategory = selectedCategory === 'All' || task.category === selectedCategory
+    
+    return matchesSearch && matchesStatus && matchesPriority && matchesCategory
+  })
 
   // Calculate statistics
   const totalTasks = tasks.length
   const completedTasks = tasks.filter(task => task.status === 'Completed').length
   const inProgressTasks = tasks.filter(task => task.status === 'In Progress').length
   const overdueTasks = tasks.filter(task => task.status === 'Overdue').length
+
+  // Get unique values for filters
+  const categories = [...new Set(tasks.map(task => task.category).filter(Boolean))]
+
+  // Dropdown options
+  const statusOptions = [
+    { value: 'All', label: 'All Status' },
+    { value: 'Pending', label: 'Pending' },
+    { value: 'In Progress', label: 'In Progress' },
+    { value: 'Completed', label: 'Completed' },
+    { value: 'Scheduled', label: 'Scheduled' },
+    { value: 'Overdue', label: 'Overdue' }
+  ]
+
+  const priorityOptions = [
+    { value: 'All', label: 'All Priorities' },
+    { value: 'Low', label: 'Low' },
+    { value: 'Medium', label: 'Medium' },
+    { value: 'High', label: 'High' },
+    { value: 'Critical', label: 'Critical' }
+  ]
+
+  const categoryOptions = [
+    { value: 'All', label: 'All Categories' },
+    ...categories.map(category => ({ value: category, label: category }))
+  ]
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -218,10 +1032,6 @@ function TaskMonitoring() {
                   <span className="text-[var(--color-foreground)]/70">{task.date}</span>
                 </div>
                 <div className="flex items-center space-x-2 text-sm">
-                  <Clock className="h-4 w-4 text-[var(--color-primary)]" />
-                  <span className="text-[var(--color-foreground)]/70">{task.startTime} - {task.endTime}</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm">
                   <MapPin className="h-4 w-4 text-[var(--color-primary)]" />
                   <span className="text-[var(--color-foreground)]/70">{task.location}</span>
                 </div>
@@ -229,7 +1039,9 @@ function TaskMonitoring() {
               <div className="space-y-2">
                 <div className="flex items-center space-x-2 text-sm">
                   <Users className="h-4 w-4 text-[var(--color-primary)]" />
-                  <span className="text-[var(--color-foreground)]/70">{task.assignedMembers.length} members</span>
+                  <span className="text-[var(--color-foreground)]/70">
+                    {task.assigned_employees ? task.assigned_employees.length : 0} members
+                  </span>
                 </div>
                 <div className="text-sm">
                   <span className="text-[var(--color-foreground)]/70">Category: </span>
@@ -243,53 +1055,29 @@ function TaskMonitoring() {
             </div>
 
             <div className="mb-4">
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-[var(--color-foreground)]/70">Progress</span>
-                <span className="text-[var(--color-foreground)]">{task.progress}%</span>
-              </div>
-              <div className="w-full bg-[var(--color-muted)] rounded-full h-2">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${task.progress}%` }}
-                  transition={{ duration: 1, delay: index * 0.1 }}
-                  className={`h-2 rounded-full ${
-                    task.progress === 100 ? 'bg-[var(--color-primary)]' :
-                    task.progress > 50 ? 'bg-[var(--color-secondary)]' :
-                    task.progress > 0 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-muted)]'
-                  }`}
-                />
-              </div>
-            </div>
-
-            <div className="mb-4">
               <h4 className="text-sm font-medium text-[var(--color-foreground)] mb-2">Assigned Members:</h4>
               <div className="flex flex-wrap gap-2">
-                {task.assignedMembers.map((member, idx) => (
-                  <span
-                    key={idx}
-                    className="px-2 py-1 bg-[var(--color-muted)] text-[var(--color-muted-foreground)] rounded-full text-xs"
-                  >
-                    {member}
-                  </span>
-                ))}
+                {task.assigned_employees && task.assigned_employees.length > 0 ? (
+                  task.assigned_employees.map((employee, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-1 bg-[var(--color-muted)] text-[var(--color-muted-foreground)] rounded-full text-xs"
+                    >
+                      {employee.name}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-sm text-[var(--color-foreground)]/70">No employees assigned</span>
+                )}
               </div>
             </div>
 
-            <div className="flex justify-between items-center">
-              <div className="text-xs text-[var(--color-foreground)]/70">
-                <span>Est: {task.estimatedHours}h</span>
-                {task.actualHours > 0 && (
-                  <span className="ml-2">Actual: {task.actualHours}h</span>
-                )}
-              </div>
+            <div className="flex justify-end items-center">
               <div className="flex space-x-2">
-                <Button size="sm" variant="ghost" className="text-[var(--color-primary)] hover:bg-[#0e1048] hover:text-white">
-                  <Eye className="h-4 w-4" />
-                </Button>
-                <Button size="sm" variant="ghost" className="text-[var(--color-secondary)] hover:bg-[#0e1048] hover:text-white">
+                <Button size="sm" variant="ghost" className="text-[var(--color-secondary)] hover:bg-[#0e1048] hover:text-white" onClick={() => openEditModal(task)}>
                   <Edit className="h-4 w-4" />
                 </Button>
-                <Button size="sm" variant="ghost" className="text-[var(--color-destructive)] hover:bg-[#0e1048] hover:text-white">
+                <Button size="sm" variant="ghost" className="text-[var(--color-destructive)] hover:bg-[#0e1048] hover:text-white" onClick={() => openDeleteModal(task)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -300,122 +1088,156 @@ function TaskMonitoring() {
     )
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {/* Success Alert */}
+      <SuccessAlert
+        message={successAlert.message}
+        isVisible={successAlert.isVisible}
+        onClose={() => setSuccessAlert({ isVisible: false, message: '' })}
+      />
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex flex-col md:flex-row md:items-center md:justify-between"
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
       >
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] bg-clip-text text-transparent">
             Task Monitoring
           </h1>
-          <p className="text-[var(--color-foreground)]/70 mt-2">Track and manage all tasks and assignments</p>
+          <p className="text-[var(--color-foreground)]/70 mt-1">Track and manage all tasks and assignments</p>
         </div>
-        <motion.div
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <Button 
+          className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] hover:from-[var(--color-secondary)] hover:to-[var(--color-primary)] text-white"
+          onClick={() => setIsAddModalOpen(true)}
         >
-          <Button 
-            onClick={() => setShowAddForm(true)}
-            className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] hover:from-[var(--color-secondary)] hover:to-[var(--color-primary)] text-white"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Task
-          </Button>
-        </motion.div>
+          <Plus className="h-4 w-4 mr-2" />
+          Create Task
+        </Button>
       </motion.div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {[
-          { title: 'Total Tasks', count: totalTasks, color: 'from-[var(--color-primary)] to-[var(--color-secondary)]', icon: ClipboardList },
-          { title: 'Completed', count: completedTasks, color: 'from-[var(--color-primary)] to-[var(--color-secondary)]', icon: CheckCircle },
-          { title: 'In Progress', count: inProgressTasks, color: 'from-[var(--color-primary)] to-[var(--color-secondary)]', icon: Play },
-          { title: 'Overdue', count: overdueTasks, color: 'from-[var(--color-primary)] to-[var(--color-secondary)]', icon: AlertCircle }
-        ].map((stat, index) => {
-          const Icon = stat.icon
-          return (
-            <motion.div
-              key={stat.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              whileHover={{ scale: 1.02 }}
-            >
-              <Card className="bg-white border-[var(--color-border)] hover:border-[var(--color-primary)] transition-colors shadow-md">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-[var(--color-foreground)]/70">{stat.title}</p>
-                      <p className="text-2xl font-bold text-[var(--color-foreground)]">{stat.count}</p>
-                    </div>
-                    <div className={`p-3 rounded-lg bg-gradient-to-r ${stat.color}`}>
-                      <Icon className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )
-        })}
-      </div>
+      {/* Statistics Cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-1 md:grid-cols-4 gap-6"
+      >
+        <Card className="bg-white border-[var(--color-border)] hover:border-[var(--color-primary)] transition-colors shadow-md">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-[var(--color-foreground)]/70">Total Tasks</p>
+                <p className="text-3xl font-bold text-[var(--color-foreground)]">{totalTasks}</p>
+                <p className="text-sm text-[var(--color-primary)] mt-1">All tasks</p>
+              </div>
+              <div className="p-3 bg-[var(--color-primary)]/20 rounded-lg">
+                <ClipboardList className="h-8 w-8 text-[var(--color-primary)]" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white border-[var(--color-border)] hover:border-[var(--color-primary)] transition-colors shadow-md">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-[var(--color-foreground)]/70">Completed</p>
+                <p className="text-3xl font-bold text-[var(--color-foreground)]">{completedTasks}</p>
+                <p className="text-sm text-[var(--color-primary)] mt-1">Finished tasks</p>
+              </div>
+              <div className="p-3 bg-[var(--color-primary)]/20 rounded-lg">
+                <CheckCircle className="h-8 w-8 text-[var(--color-primary)]" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white border-[var(--color-border)] hover:border-[var(--color-primary)] transition-colors shadow-md">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-[var(--color-foreground)]/70">In Progress</p>
+                <p className="text-3xl font-bold text-[var(--color-foreground)]">{inProgressTasks}</p>
+                <p className="text-sm text-[var(--color-primary)] mt-1">Active tasks</p>
+              </div>
+              <div className="p-3 bg-[var(--color-primary)]/20 rounded-lg">
+                <Play className="h-8 w-8 text-[var(--color-primary)]" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white border-[var(--color-border)] hover:border-[var(--color-primary)] transition-colors shadow-md">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-[var(--color-foreground)]/70">Overdue</p>
+                <p className="text-3xl font-bold text-[var(--color-foreground)]">{overdueTasks}</p>
+                <p className="text-sm text-[var(--color-primary)] mt-1">Delayed tasks</p>
+              </div>
+              <div className="p-3 bg-[var(--color-primary)]/20 rounded-lg">
+                <AlertCircle className="h-8 w-8 text-[var(--color-primary)]" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Filters and Search */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
+        transition={{ delay: 0.2 }}
       >
         <Card className="bg-white border-[var(--color-border)] shadow-md">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row gap-4">
               {/* Search Bar */}
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-foreground)]/70" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-foreground)]/70 h-4 w-4" />
                 <input
                   type="text"
-                  placeholder="Search tasks, members, or locations..."
+                  placeholder="Search tasks, employees, or locations..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] placeholder-[var(--color-foreground)]/50 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                  className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
                 />
               </div>
 
               {/* Filters */}
               <div className="flex flex-wrap gap-2">
-                <select
+                <CustomDropdown
                   value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none appearance-none cursor-pointer"
-                >
-                  {statusOptions.map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
-
-                <select
+                  onChange={setSelectedStatus}
+                  options={statusOptions}
+                  placeholder="Filter by status"
+                  className="min-w-[150px]"
+                />
+                <CustomDropdown
                   value={selectedPriority}
-                  onChange={(e) => setSelectedPriority(e.target.value)}
-                  className="px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none appearance-none cursor-pointer"
-                >
-                  {priorityOptions.map(priority => (
-                    <option key={priority} value={priority}>{priority}</option>
-                  ))}
-                </select>
-
-                <select
+                  onChange={setSelectedPriority}
+                  options={priorityOptions}
+                  placeholder="Filter by priority"
+                  className="min-w-[150px]"
+                />
+                <CustomDropdown
                   value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none appearance-none cursor-pointer"
-                >
-                  {categoryOptions.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
+                  onChange={setSelectedCategory}
+                  options={categoryOptions}
+                  placeholder="Filter by category"
+                  className="min-w-[150px]"
+                />
               </div>
             </div>
           </CardContent>
@@ -426,15 +1248,12 @@ function TaskMonitoring() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
+        transition={{ delay: 0.3 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <AnimatePresence>
-            {filteredTasks.map((task, index) => (
-              <TaskCard key={task.id} task={task} index={index} />
-            ))}
-          </AnimatePresence>
-        </div>
+        {filteredTasks.map((task, index) => (
+          <TaskCard key={task.id} task={task} index={index} />
+        ))}
       </motion.div>
 
       {filteredTasks.length === 0 && (
@@ -443,17 +1262,40 @@ function TaskMonitoring() {
           animate={{ opacity: 1 }}
           className="text-center py-12"
         >
-          <ClipboardList className="h-16 w-16 text-[var(--color-foreground)]/50 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-[var(--color-foreground)]/70 mb-2">No tasks found</h3>
-          <p className="text-[var(--color-foreground)]/50">Try adjusting your search criteria or create a new task.</p>
+          <ClipboardList className="h-12 w-12 text-[var(--color-foreground)]/30 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-[var(--color-foreground)]/70 mb-2">No tasks found</h3>
+          <p className="text-[var(--color-foreground)]/50">Try adjusting your search or filters</p>
         </motion.div>
       )}
+
+      {/* Modals */}
+      <AddTaskModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSubmit={handleAddTask}
+        isSubmitting={isSubmitting}
+        employees={employees}
+      />
+
+      <EditTaskModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSubmit={handleEditTask}
+        isSubmitting={isSubmitting}
+        task={selectedTask}
+        employees={employees}
+      />
+
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteTask}
+        isDeleting={isDeleting}
+        taskName={selectedTask?.name}
+      />
     </div>
   )
 }
 
 export default TaskMonitoring
-
-
-
 
