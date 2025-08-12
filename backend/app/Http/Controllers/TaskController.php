@@ -34,6 +34,12 @@ class TaskController extends Controller
                 } else {
                     $task->assigned_employees = [];
                 }
+
+                // Get comment count for each task
+                $commentCount = DB::table('task_comments')
+                    ->where('task_id', $task->id)
+                    ->count();
+                $task->comments_count = $commentCount;
             }
 
             return response()->json([
@@ -142,6 +148,12 @@ class TaskController extends Controller
             } else {
                 $task->assigned_employees = [];
             }
+
+            // Get comment count
+            $commentCount = DB::table('task_comments')
+                ->where('task_id', $task->id)
+                ->count();
+            $task->comments_count = $commentCount;
 
             return response()->json([
                 'success' => true,

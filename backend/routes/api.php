@@ -10,6 +10,7 @@ use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\EmergencyCashAdvanceController;
 use App\Http\Controllers\EmergencyDeductionController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\DailyUpdateController;
 use App\Http\Controllers\VehicleController;
@@ -41,6 +42,13 @@ Route::get("vehicles/search", [VehicleController::class, "search"]);
 
 // Task routes
 Route::apiResource("tasks", TaskController::class);
+
+// Task Comment routes
+Route::get("tasks/{taskId}/comments", [TaskCommentController::class, "index"]);
+Route::post("tasks/{taskId}/comments", [TaskCommentController::class, "store"]);
+Route::put("tasks/{taskId}/comments/{commentId}", [TaskCommentController::class, "update"]);
+Route::delete("tasks/{taskId}/comments/{commentId}", [TaskCommentController::class, "destroy"]);
+Route::get("tasks/{taskId}/comments/count", [TaskCommentController::class, "getCommentCount"]);
 
 // Project routes (public for now, can be protected later)
 Route::apiResource("projects", ProjectController::class);

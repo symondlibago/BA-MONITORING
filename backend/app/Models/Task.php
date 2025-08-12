@@ -42,5 +42,29 @@ class Task extends Model
     {
         return $this->belongsToMany(Employee::class, 'task_employee', 'task_id', 'employee_id');
     }
+
+    /**
+     * Get the comments for this task.
+     */
+    public function comments()
+    {
+        return $this->hasMany(TaskComment::class);
+    }
+
+    /**
+     * Get the count of comments for this task.
+     */
+    public function getCommentsCountAttribute()
+    {
+        return $this->comments()->count();
+    }
+
+    /**
+     * Get top-level comments with replies.
+     */
+    public function getCommentsWithReplies()
+    {
+        return TaskComment::getCommentsWithReplies($this->id);
+    }
 }
 
