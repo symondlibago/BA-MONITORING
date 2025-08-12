@@ -10,6 +10,10 @@ use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\EmergencyCashAdvanceController;
 use App\Http\Controllers\EmergencyDeductionController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\DailyUpdateController;
+use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\RFIQueryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -29,8 +33,21 @@ Route::post("/login", [AuthController::class, "login"]);
 // Expense routes (public for now, can be protected later)
 Route::apiResource("expenses", ExpenseController::class);
 
+// Vehicle routes (public for now, can be protected later)
+Route::apiResource("vehicles", VehicleController::class);
+Route::patch("vehicles/{id}/status", [VehicleController::class, "updateStatus"]);
+Route::get("vehicles/status/{status}", [VehicleController::class, "getByStatus"]);
+Route::get("vehicles/search", [VehicleController::class, "search"]);
+
 // Task routes
 Route::apiResource("tasks", TaskController::class);
+
+// Project routes (public for now, can be protected later)
+Route::apiResource("projects", ProjectController::class);
+
+// Daily Update routes (public for now, can be protected later)
+Route::apiResource("daily-updates", DailyUpdateController::class);
+Route::get("projects/{projectId}/daily-updates", [DailyUpdateController::class, "index"]);
 
 // Protected routes
 Route::middleware("auth:sanctum")->group(function () {
@@ -63,6 +80,13 @@ Route::middleware("api")->group(function () {
     
     // Emergency Deduction routes
     Route::apiResource("emergency-deductions", EmergencyDeductionController::class);
+
+    // RFI Query routes
+    Route::apiResource("rfi-queries", RFIQueryController::class);
+    Route::patch("rfi-queries/{id}/status", [RFIQueryController::class, "updateStatus"]);
+    Route::get("rfi-queries/status/{status}", [RFIQueryController::class, "getByStatus"]);
+    Route::get("rfi-queries/search", [RFIQueryController::class, "search"]);
+
     
 });
 

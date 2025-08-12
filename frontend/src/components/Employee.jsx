@@ -1159,7 +1159,7 @@ const Employee = () => {
                   <Button 
                     size="sm" 
                     variant="outline" 
-                    className="border-[var(--color-destructive)]/30 text-[var(--color-destructive)] hover:bg-[#0e1048] hover:text-white"
+                    className="border-[var(--color-destructive)]/30 text-[var(--color-destructive)] hover:bg-red-500 hover:text-white"
                     onClick={() => openDeleteModal(employee)}
                   >
                     <Trash2 className="h-3 w-3" />

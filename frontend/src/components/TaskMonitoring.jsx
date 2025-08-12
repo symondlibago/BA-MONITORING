@@ -1077,7 +1077,7 @@ function TaskMonitoring() {
                 <Button size="sm" variant="ghost" className="text-[var(--color-secondary)] hover:bg-[#0e1048] hover:text-white" onClick={() => openEditModal(task)}>
                   <Edit className="h-4 w-4" />
                 </Button>
-                <Button size="sm" variant="ghost" className="text-[var(--color-destructive)] hover:bg-[#0e1048] hover:text-white" onClick={() => openDeleteModal(task)}>
+                <Button size="sm" variant="ghost" className="text-[var(--color-destructive)] hover:bg-red-500 hover:text-white" onClick={() => openDeleteModal(task)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>

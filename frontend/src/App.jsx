@@ -12,7 +12,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Users,
-  LogOut
+  LogOut,
+  MapPin,
+  Car,
+  FileQuestion
 } from 'lucide-react'
 import { Button } from '@/components/ui/button.jsx'
 import './App.css'
@@ -24,6 +27,9 @@ import EquipmentInventory from './components/EquipmentInventory'
 import TaskMonitoring from './components/TaskMonitoring'
 import WorkersPayroll from './components/WorkersPayroll'
 import Employee from './components/Employee'
+import SiteOperation from './components/SiteOperation'
+import VehicleMonitoring from './components/VehicleMonitoring'
+import RFIQueries from './components/RFIQueries'
 import ProtectedRoute from './components/ProtectedRoute'
 import { logout, isAuthenticated, getUser } from './utils/auth'
 
@@ -34,6 +40,9 @@ const navigationItems = [
   { path: '/tasks', icon: ClipboardList, label: 'Task Monitoring', color: 'text-white' },
   { path: '/payroll', icon: DollarSign, label: 'Workers Payroll', color: 'text-white' },
   { path: '/employees', icon: Users, label: 'Employee Management', color: 'text-white' },
+  { path: '/vehicles', icon: Car, label: 'Vehicle Monitoring', color: 'text-white' },
+  { path: '/rfi-queries', icon: FileQuestion, label: 'RFI-Queries', color: 'text-white' },
+  { path: '/site-operation', icon: MapPin, label: 'Site Operation', color: 'text-white' },
 ]
 
 function Sidebar({ isCollapsed, toggleSidebar, onLogout, isMobile, closeMobileSidebar }) {
@@ -241,6 +250,9 @@ function MainContent({ sidebarCollapsed, onLogout, isMobile }) {
           <Route path="/tasks" element={<TaskMonitoring />} />
           <Route path="/payroll" element={<WorkersPayroll />} />
           <Route path="/employees" element={<Employee />} />
+          <Route path="/vehicles" element={<VehicleMonitoring />} />
+          <Route path="/rfi-queries" element={<RFIQueries />} />
+          <Route path="/site-operation" element={<SiteOperation />} />
         </Routes>
       </motion.div>
     </motion.main>
@@ -335,5 +347,4 @@ function App() {
 }
 
 export default App
-
 
