@@ -371,192 +371,6 @@ const UpdatePayrollModal = React.memo(({ isOpen, onClose, record, onUpdate, isUp
   )
 })
 
-// Attendance Detail Modal
-const AttendanceDetailModal = React.memo(({ isOpen, onClose, record }) => {
-  const [attendanceData, setAttendanceData] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  // Fetch attendance data when modal opens
-  useEffect(() => {
-    if (isOpen && record) {
-      fetchAttendanceData()
-    }
-  }, [isOpen, record])
-
-  const fetchAttendanceData = async () => {
-    try {
-      setLoading(true)
-      setError('')
-      
-      const response = await fetch(`${API_BASE_URL}/payrolls/${record.id}/attendance`)
-      const data = await response.json()
-      
-      if (data.success) {
-        setAttendanceData(data.data)
-      } else {
-        setError(data.message || 'Failed to fetch attendance data')
-      }
-    } catch (error) {
-      console.error('Error fetching attendance data:', error)
-      setError('Failed to fetch attendance data')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (!isOpen || !record) return null
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
-                Attendance Details - {record.employee_name}
-              </h2>
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            {loading && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                <span className="ml-2 text-gray-600">Loading attendance data...</span>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                <div className="flex items-center">
-                  <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-                  <p className="text-red-800">{error}</p>
-                </div>
-              </div>
-            )}
-
-            {attendanceData && (
-              <div className="space-y-6">
-                {/* Employee Info */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Employee ID</p>
-                      <p className="font-medium">{attendanceData.employee_info.employee_id}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Position</p>
-                      <p className="font-medium">{attendanceData.employee_info.position}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Department</p>
-                      <p className="font-medium">{attendanceData.employee_info.department}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Pay Period</p>
-                      <p className="font-medium">{attendanceData.employee_info.pay_period}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Daily Attendance */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Attendance Breakdown</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border border-gray-200 rounded-lg">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700 border-b">Day</th>
-                          <th className="text-center py-3 px-4 text-sm font-medium text-gray-700 border-b">Status</th>
-                          <th className="text-center py-3 px-4 text-sm font-medium text-gray-700 border-b">Overtime (hrs)</th>
-                          <th className="text-center py-3 px-4 text-sm font-medium text-gray-700 border-b">Late (mins)</th>
-                          <th className="text-center py-3 px-4 text-sm font-medium text-gray-700 border-b">Site Address</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {attendanceData.attendance_data.map((day, index) => (
-                          <tr key={day.day} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            <td className="py-3 px-4 text-sm font-medium text-gray-900 border-b">
-                              {day.day}
-                            </td>
-                            <td className="py-3 px-4 text-center border-b">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                day.present 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {day.present ? 'Present' : 'Absent'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-center text-sm text-gray-900 border-b">
-                              {day.present ? `${day.overtime}h` : '-'}
-                            </td>
-                            <td className="py-3 px-4 text-center text-sm text-gray-900 border-b">
-                              {day.present && day.late !== '0' ? `${day.late} mins` : '-'}
-                            </td>
-                            <td className="py-3 px-4 text-center text-sm text-gray-900 border-b">
-                              {day.present && day.site_address ? day.site_address : '-'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Summary */}
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Summary</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <p className="text-sm text-gray-600">Days Present</p>
-                      <p className="text-xl font-bold text-blue-600">
-                        {attendanceData.summary.days_present}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm text-gray-600">Total OT</p>
-                      <p className="text-xl font-bold text-green-600">
-                        {attendanceData.summary.total_overtime}h
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm text-gray-600">Total Late</p>
-                      <p className="text-xl font-bold text-red-600">
-                        {attendanceData.summary.total_late} mins
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm text-gray-600">Net Pay</p>
-                      <p className="text-xl font-bold text-purple-600">
-                        ₱{parseFloat(attendanceData.summary.net_pay).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  )
-})
-
 // Process Payroll Modal
 const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmitting }) => {
   const [step, setStep] = useState(1) // 1: Select Type, 2: Process Payroll
@@ -575,6 +389,7 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
   const [formData, setFormData] = useState({
     payPeriodStart: '',
     payPeriodEnd: '',
+    // Site payroll fields
     workingDays: {
       monday: false,
       tuesday: false,
@@ -607,6 +422,11 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
       friday: '',
       saturday: ''
     },
+    // Office payroll fields
+    totalWorkingDays: '',
+    totalLateMinutes: '',
+    totalOvertimeHours: '',
+    // Common fields
     cashAdvance: '',
     cashAdvanceBalance: '',
     emergencyCashAdvance: '',
@@ -659,6 +479,9 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
           friday: '',
           saturday: ''
         },
+        totalWorkingDays: '',
+        totalLateMinutes: '',
+        totalOvertimeHours: '',
         cashAdvance: '',
         cashAdvanceBalance: '',
         emergencyCashAdvance: '',
@@ -673,22 +496,17 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
     try {
       setLoadingEmployees(true)
       setEmployeeError('')
-      console.log(`Fetching employees with status: ${status}`)
-      console.log(`API URL: ${API_BASE_URL}/employees/status/${status}`)
       
       const response = await fetch(`${API_BASE_URL}/employees/status/${status}`)
-      console.log('Response status:', response.status)
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
       const data = await response.json()
-      console.log('Response data:', data)
       
       if (data.success) {
         setEmployees(data.data || [])
-        console.log('Employees loaded:', data.data?.length || 0)
         if (!data.data || data.data.length === 0) {
           setEmployeeError(`No ${status} employees found. Please add employees first.`)
         }
@@ -703,8 +521,8 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
     }
   }, [])
 
-  // Fetch employee ECA/ED data
-  const fetchEmployeeEcaEd = useCallback(async (employeeId) => {
+  // Fetch ECA/ED data for selected employee
+  const fetchEcaEdData = useCallback(async (employeeId) => {
     try {
       setLoadingEcaEd(true)
       setEcaEdError('')
@@ -715,8 +533,8 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
       if (data.success) {
         setEcaEdData(data.data)
         
-        // Auto-fill cash advance if ED exists
-        if (data.data.ed && data.data.ed.amount) {
+        // Auto-fill cash advance if there's an active ED
+        if (data.data.has_active_ed && data.data.ed) {
           setFormData(prev => ({
             ...prev,
             cashAdvance: data.data.ed.amount.toString()
@@ -736,98 +554,19 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
   // Handle payroll type selection
   const handlePayrollTypeSelect = useCallback((type) => {
     setPayrollType(type)
-    setStep(2)
     fetchEmployeesByStatus(type)
+    setStep(2)
   }, [fetchEmployeesByStatus])
 
   // Handle employee selection
   const handleEmployeeSelect = useCallback((employeeId) => {
     setSelectedEmployee(employeeId)
     if (employeeId) {
-      fetchEmployeeEcaEd(employeeId)
+      fetchEcaEdData(employeeId)
     } else {
       setEcaEdData(null)
-      setFormData(prev => ({
-        ...prev,
-        cashAdvance: ''
-      }))
     }
-  }, [fetchEmployeeEcaEd])
-
-  // Calculate totals
-  const calculations = useMemo(() => {
-    const selectedEmp = employees.find(emp => emp.id == selectedEmployee)
-    if (!selectedEmp) {
-      return {
-        workingDaysCount: 0,
-        totalOT: 0,
-        totalLate: 0,
-        basicSalary: 0,
-        overtimePay: 0,
-        lateDeduction: 0,
-        grossPay: 0,
-        totalDeductions: 0,
-        netPay: 0,
-        deductionBreakdown: {
-          lateDeduction: 0,
-          cashAdvance: 0,
-          emergencyCashAdvance: 0,
-          emergencyDeduction: 0,
-          othersDeduction: 0
-        }
-      }
-    }
-
-    const workingDaysCount = Object.values(formData.workingDays).filter(Boolean).length
-    const totalOT = Object.values(formData.overtime).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
-    const totalLate = Object.values(formData.late).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
-    
-    const dailyRate = parseFloat(selectedEmp.rate) || 0
-    const hourlyRate = parseFloat(selectedEmp.hourly_rate) || 0
-    const cashAdvance = parseFloat(formData.cashAdvance) || 0
-    const emergencyCashAdvance = parseFloat(formData.emergencyCashAdvance) || 0
-    const emergencyDeduction = parseFloat(formData.emergencyDeduction) || 0
-    const othersDeduction = parseFloat(formData.othersDeduction) || 0
-
-    // Basic salary calculation
-    const basicSalary = workingDaysCount * dailyRate
-    const overtimePay = totalOT * hourlyRate
-    const lateDeduction = (totalLate / 60) * hourlyRate
-    const grossPay = basicSalary + overtimePay
-    // Deduction breakdown
-    const deductionBreakdown = {
-      lateDeduction: lateDeduction,
-      cashAdvance: cashAdvance,
-      emergencyCashAdvance: emergencyCashAdvance,
-      emergencyDeduction: emergencyDeduction,
-      othersDeduction: othersDeduction
-    }
-
-    // Total deductions
-    const totalDeductions = lateDeduction + cashAdvance + emergencyCashAdvance + emergencyDeduction + othersDeduction
-
-    // Net pay
-    const netPay = grossPay - totalDeductions
-
-    return {
-      workingDaysCount,
-      totalOT: totalOT.toFixed(1),
-      totalLate: totalLate.toFixed(0),
-      basicSalary: basicSalary.toFixed(2),
-      overtimePay: overtimePay.toFixed(2),
-      lateDeduction: lateDeduction.toFixed(2),
-      grossPay: grossPay.toFixed(2),
-      totalDeductions: totalDeductions.toFixed(2),
-      netPay: netPay.toFixed(2),
-      deductionBreakdown: {
-        lateDeduction: lateDeduction.toFixed(2),
-        cashAdvance: cashAdvance.toFixed(2),
-        emergencyCashAdvance: emergencyCashAdvance.toFixed(2),
-        emergencyDeduction: emergencyDeduction.toFixed(2),
-        othersDeduction: othersDeduction.toFixed(2)
-      }
-    }
-  }, [selectedEmployee, employees, formData])
+  }, [fetchEcaEdData])
 
   // Handle input changes
   const handleInputChange = useCallback((field, value) => {
@@ -848,7 +587,7 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
     }
   }, [])
 
-  // Handle checkbox changes for working days
+  // Handle checkbox changes for site payroll
   const handleCheckboxChange = useCallback((day) => {
     setFormData(prev => ({
       ...prev,
@@ -859,44 +598,81 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
     }))
   }, [])
 
-  // Handle form submission
-  const handleSubmit = useCallback(() => {
-    const selectedEmp = employees.find(emp => emp.id == selectedEmployee)
-    if (!selectedEmp) return
-
-    const payrollData = {
-      employee_id: selectedEmployee,
-      payroll_type: payrollType,
-      pay_period_start: formData.payPeriodStart,
-      pay_period_end: formData.payPeriodEnd,
-      working_days: calculations.workingDaysCount,
-      overtime_hours: parseFloat(calculations.totalOT),
-      late_minutes: parseFloat(calculations.totalLate),
-      cash_advance: parseFloat(formData.cashAdvance) || 0,
-      emergency_cash_advance: parseFloat(formData.emergencyCashAdvance) || 0,
-      emergency_deduction: parseFloat(formData.emergencyDeduction) || 0,
-      others_deduction: parseFloat(formData.othersDeduction) || 0,
-      // Add daily attendance data
-      daily_attendance: formData.workingDays,
-      daily_overtime: formData.overtime,
-      daily_late: formData.late,
-      daily_site_address: formData.siteAddress
+  // Calculate totals for site payroll
+  const calculations = useMemo(() => {
+    if (payrollType !== 'Site') return { workingDaysCount: 0, totalOT: 0, totalLate: 0, basicSalary: '0.00' }
+    
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    const workingDaysCount = days.filter(day => formData.workingDays[day]).length
+    const totalOT = days.reduce((sum, day) => sum + (parseFloat(formData.overtime[day]) || 0), 0)
+    const totalLate = days.reduce((sum, day) => sum + (parseFloat(formData.late[day]) || 0), 0)
+    
+    const selectedEmp = employees.find(emp => emp.id.toString() === selectedEmployee)
+    const dailyRate = selectedEmp ? parseFloat(selectedEmp.rate) : 0
+    const basicSalary = (dailyRate * workingDaysCount).toFixed(2)
+    
+    return {
+      workingDaysCount,
+      totalOT: totalOT.toFixed(1),
+      totalLate: totalLate.toFixed(0),
+      basicSalary
     }
+  }, [formData, selectedEmployee, employees, payrollType])
 
-    onSubmit(payrollData)
-  }, [selectedEmployee, employees, payrollType, formData, calculations, onSubmit])
+  // Handle form submission
+  const handleSubmit = useCallback(async () => {
+    try {
+      const selectedEmp = employees.find(emp => emp.id.toString() === selectedEmployee)
+      if (!selectedEmp) return
 
-  // Employee options for dropdown
-  const employeeOptions = employees.map(emp => ({
-    value: emp.id,
-    label: `${emp.name} (${emp.employee_id}) - ${emp.position}`
-  }))
+      let submitData
+      
+      if (payrollType === 'Site') {
+        // Site payroll submission
+        submitData = {
+          employee_id: selectedEmployee,
+          payroll_type: payrollType,
+          pay_period_start: formData.payPeriodStart,
+          pay_period_end: formData.payPeriodEnd,
+          working_days: calculations.workingDaysCount,
+          overtime_hours: parseFloat(calculations.totalOT),
+          late_minutes: parseFloat(calculations.totalLate),
+          cash_advance: parseFloat(formData.cashAdvance) || 0,
+          others_deduction: parseFloat(formData.othersDeduction) || 0,
+          emergency_cash_advance: parseFloat(formData.emergencyCashAdvance) || 0,
+          emergency_deduction: parseFloat(formData.emergencyDeduction) || 0,
+          daily_attendance: formData.workingDays,
+          daily_overtime: formData.overtime,
+          daily_late: formData.late,
+          daily_site_address: formData.siteAddress
+        }
+        
+        await onSubmit(submitData, 'payrolls')
+      } else {
+        // Office payroll submission
+        submitData = {
+          employee_id: selectedEmployee,
+          pay_period_start: formData.payPeriodStart,
+          pay_period_end: formData.payPeriodEnd,
+          total_working_days: parseInt(formData.totalWorkingDays) || 0,
+          total_late_minutes: parseFloat(formData.totalLateMinutes) || 0,
+          total_overtime_hours: parseFloat(formData.totalOvertimeHours) || 0,
+          cash_advance: parseFloat(formData.cashAdvance) || 0,
+          others_deduction: parseFloat(formData.othersDeduction) || 0,
+          emergency_cash_advance: parseFloat(formData.emergencyCashAdvance) || 0,
+          emergency_deduction: parseFloat(formData.emergencyDeduction) || 0
+        }
+        
+        await onSubmit(submitData, 'office-payrolls')
+      }
+    } catch (error) {
+      console.error('Error submitting payroll:', error)
+    }
+  }, [formData, selectedEmployee, employees, payrollType, calculations, onSubmit])
 
-  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
-  // Check if ECA/ED fields should be readonly
   const isEcaEdReadonly = ecaEdData?.is_readonly || false
+  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+  const dayLabels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
   if (!isOpen) return null
 
@@ -907,58 +683,75 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-        onClick={() => !isSubmitting && onClose()}
+        onClick={onClose}
       >
         <motion.div
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
-                {step === 1 ? 'Process Payroll' : `Process ${payrollType} Payroll`}
+                {step === 1 ? 'Select Payroll Type' : `Process ${payrollType} Payroll`}
               </h2>
-              <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
+              <Button variant="ghost" size="sm" onClick={onClose}>
                 <X className="h-5 w-5" />
               </Button>
             </div>
 
             {step === 1 && (
               <div className="space-y-6">
-                <p className="text-gray-600 text-center">Select payroll type to process</p>
+                <p className="text-gray-600">Choose the type of payroll you want to process:</p>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <motion.button
+                  <motion.div
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => handlePayrollTypeSelect('Site')}
-                    className="p-8 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 group"
+                    className="p-6 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all"
                   >
-                    <div className="flex flex-col items-center space-y-4">
-                      <div className="p-4 bg-blue-100 rounded-full group-hover:bg-blue-200 transition-colors">
-                        <HardHat className="h-8 w-8 text-blue-600" />
+                    <div className="flex items-center mb-4">
+                      <div className="p-3 bg-orange-100 rounded-lg mr-4">
+                        <HardHat className="h-8 w-8 text-orange-600" />
                       </div>
-                      <h3 className="text-xl font-semibold text-gray-900">Site Payroll</h3>
-                      <p className="text-gray-600 text-center">Process weekly payroll for site workers</p>
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900">Site Payroll</h3>
+                        <p className="text-gray-600">For site employees with daily attendance</p>
+                      </div>
                     </div>
-                  </motion.button>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      <li>• Daily attendance tracking (Monday-Saturday)</li>
+                      <li>• Overtime and late tracking per day</li>
+                      <li>• Site address recording</li>
+                      <li>• Checkbox-based attendance</li>
+                    </ul>
+                  </motion.div>
 
-                  <motion.button
+                  <motion.div
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => handlePayrollTypeSelect('Office')}
-                    className="p-8 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 group"
+                    className="p-6 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all"
                   >
-                    <div className="flex flex-col items-center space-y-4">
-                      <div className="p-4 bg-green-100 rounded-full group-hover:bg-green-200 transition-colors">
-                        <Building className="h-8 w-8 text-green-600" />
+                    <div className="flex items-center mb-4">
+                      <div className="p-3 bg-blue-100 rounded-lg mr-4">
+                        <Building className="h-8 w-8 text-blue-600" />
                       </div>
-                      <h3 className="text-xl font-semibold text-gray-900">Office Payroll</h3>
-                      <p className="text-gray-600 text-center">Process monthly payroll for office staff</p>
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900">Office Payroll</h3>
+                        <p className="text-gray-600">For office employees with total inputs</p>
+                      </div>
                     </div>
-                  </motion.button>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      <li>• Total working days input</li>
+                      <li>• Total late minutes input</li>
+                      <li>• Total overtime hours input</li>
+                      <li>• Simplified input fields</li>
+                    </ul>
+                  </motion.div>
                 </div>
               </div>
             )}
@@ -966,214 +759,287 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
             {step === 2 && (
               <div className="space-y-6">
                 {/* Employee Selection */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Employee Selection</h3>
+                  
+                  {loadingEmployees && (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin text-blue-600 mr-2" />
+                      <span className="text-gray-600">Loading {payrollType} employees...</span>
+                    </div>
+                  )}
+
+                  {employeeError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                      <div className="flex items-center">
+                        <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+                        <p className="text-red-800">{employeeError}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!loadingEmployees && !employeeError && employees.length > 0 && (
                     <CustomDropdown
                       label="Select Employee"
-                      required={true}
+                      required
                       value={selectedEmployee}
                       onChange={handleEmployeeSelect}
-                      options={employeeOptions}
-                      placeholder={loadingEmployees ? "Loading employees..." : employeeError || "Select an employee"}
-                      disabled={loadingEmployees || isSubmitting || employees.length === 0}
+                      options={employees.map(emp => ({
+                        value: emp.id.toString(),
+                        label: `${emp.name} (${emp.employee_id}) - ${emp.position}`
+                      }))}
+                      placeholder="Choose an employee"
+                      disabled={isSubmitting}
                     />
-                    {employeeError && (
-                      <p className="text-sm text-red-600 mt-1">{employeeError}</p>
-                    )}
-                    {!loadingEmployees && !employeeError && employees.length === 0 && (
-                      <p className="text-sm text-gray-500 mt-1">No employees found for {payrollType} status</p>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Pay Period Start <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.payPeriodStart}
-                        onChange={(e) => handleInputChange('payPeriodStart', e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Pay Period End <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.payPeriodEnd}
-                        onChange={(e) => handleInputChange('payPeriodEnd', e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                  </div>
+                  )}
                 </div>
-
-                {/* ECA/ED Information Display */}
-                {selectedEmployee && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Emergency Cash Advance & Deduction Status</h3>
-                    
-                    {loadingEcaEd && (
-                      <div className="flex items-center">
-                        <Loader2 className="h-4 w-4 animate-spin text-blue-600 mr-2" />
-                        <span className="text-gray-600">Loading ECA/ED data...</span>
-                      </div>
-                    )}
-
-                    {ecaEdError && (
-                      <div className="text-red-600 text-sm">{ecaEdError}</div>
-                    )}
-
-                    {ecaEdData && !loadingEcaEd && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {ecaEdData.has_active_eca ? (
-                          <div className="bg-white rounded-lg p-3 border">
-                            <h4 className="font-medium text-gray-900 mb-2">Active Emergency Cash Advance</h4>
-                            <div className="space-y-1 text-sm">
-                              <p><span className="text-gray-600">Original Amount:</span> ₱{parseFloat(ecaEdData.eca.amount).toFixed(2)}</p>
-                              <p><span className="text-gray-600">Remaining Balance:</span> ₱{parseFloat(ecaEdData.eca.remaining_balance).toFixed(2)}</p>
-                              <p><span className="text-gray-600">Status:</span> 
-                                <span className="ml-1 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
-                                  {ecaEdData.eca.status}
-                                </span>
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="bg-white rounded-lg p-3 border">
-                            <h4 className="font-medium text-gray-900 mb-2">Emergency Cash Advance</h4>
-                            <p className="text-sm text-gray-600">No active ECA found</p>
-                          </div>
-                        )}
-
-                        {ecaEdData.has_active_ed ? (
-                          <div className="bg-white rounded-lg p-3 border">
-                            <h4 className="font-medium text-gray-900 mb-2">Active Emergency Deduction</h4>
-                            <div className="space-y-1 text-sm">
-                              <p><span className="text-gray-600">Deduction Amount:</span> ₱{parseFloat(ecaEdData.ed.amount).toFixed(2)}</p>
-                              <p><span className="text-gray-600">Status:</span> 
-                                <span className="ml-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                                  {ecaEdData.ed.status}
-                                </span>
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="bg-white rounded-lg p-3 border">
-                            <h4 className="font-medium text-gray-900 mb-2">Emergency Deduction</h4>
-                            <p className="text-sm text-gray-600">No active ED found</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {isEcaEdReadonly && (
-                      <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
-                        <p className="text-sm text-blue-800">
-                          <AlertCircle className="h-4 w-4 inline mr-1" />
-                          ECA/ED fields are readonly until the emergency cash advance is fully paid.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {selectedEmployee && (
                   <>
-                    {/* Daily Attendance Grid */}
+                    {/* Pay Period */}
                     <div className="bg-gray-50 rounded-lg p-4">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Attendance</h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b border-gray-200">
-                              <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">Day</th>
-                              <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">Present</th>
-                              <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">OT (hrs)</th>
-                              <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">Late (mins)</th>
-                              <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">Site Address</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {days.map((day, index) => (
-                              <tr key={day} className="border-b border-gray-100">
-                                <td className="py-2 px-3 text-sm font-medium text-gray-900">
-                                  {dayLabels[index]}
-                                </td>
-                                <td className="py-2 px-3 text-center">
-                                  <input
-                                    type="checkbox"
-                                    checked={formData.workingDays[day]}
-                                    onChange={() => handleCheckboxChange(day)}
-                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                    disabled={isSubmitting}
-                                  />
-                                </td>
-                                <td className="py-2 px-3">
-                                  <input
-                                    type="number"
-                                    value={formData.overtime[day]}
-                                    onChange={(e) => handleInputChange(`overtime.${day}`, e.target.value)}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
-                                    placeholder="0"
-                                    min="0"
-                                    step="0.5"
-                                    disabled={isSubmitting || !formData.workingDays[day]}
-                                  />
-                                </td>
-                                <td className="py-2 px-3">
-                                  <input
-                                    type="number"
-                                    value={formData.late[day]}
-                                    onChange={(e) => handleInputChange(`late.${day}`, e.target.value)}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
-                                    placeholder="0"
-                                    min="0"
-                                    disabled={isSubmitting || !formData.workingDays[day]}
-                                  />
-                                </td>
-                                <td className="py-2 px-3">
-                                  <input
-                                    type="text"
-                                    value={formData.siteAddress[day]}
-                                    onChange={(e) => handleInputChange(`siteAddress.${day}`, e.target.value)}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
-                                    placeholder="Site address"
-                                    disabled={isSubmitting || !formData.workingDays[day]}
-                                  />
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Summary Row */}
-                      <div className="mt-4 bg-blue-50 rounded-lg p-3">
-                        <div className="grid grid-cols-4 gap-4 text-center">
-                          <div>
-                            <p className="text-xs text-gray-600">Working Days</p>
-                            <p className="text-lg font-semibold text-blue-600">{calculations.workingDaysCount}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-600">Total OT</p>
-                            <p className="text-lg font-semibold text-green-600">{calculations.totalOT}h</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-600">Total Late</p>
-                            <p className="text-lg font-semibold text-red-600">{calculations.totalLate} mins</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-600">Basic Salary</p>
-                            <p className="text-lg font-semibold text-purple-600">₱{calculations.basicSalary}</p>
-                          </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Pay Period</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Pay Period Start <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.payPeriodStart}
+                            onChange={(e) => handleInputChange('payPeriodStart', e.target.value)}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Pay Period End <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.payPeriodEnd}
+                            onChange={(e) => handleInputChange('payPeriodEnd', e.target.value)}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                            disabled={isSubmitting}
+                          />
                         </div>
                       </div>
                     </div>
+
+                    {/* ECA/ED Information Display */}
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Emergency Cash Advance & Deduction Status</h3>
+                      
+                      {loadingEcaEd && (
+                        <div className="flex items-center">
+                          <Loader2 className="h-4 w-4 animate-spin text-blue-600 mr-2" />
+                          <span className="text-gray-600">Loading ECA/ED data...</span>
+                        </div>
+                      )}
+
+                      {ecaEdError && (
+                        <div className="text-red-600 text-sm">{ecaEdError}</div>
+                      )}
+
+                      {ecaEdData && !loadingEcaEd && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {ecaEdData.has_active_eca ? (
+                            <div className="bg-white rounded-lg p-3 border">
+                              <h4 className="font-medium text-gray-900 mb-2">Active Emergency Cash Advance</h4>
+                              <div className="space-y-1 text-sm">
+                                <p><span className="text-gray-600">Original Amount:</span> ₱{parseFloat(ecaEdData.eca.amount).toFixed(2)}</p>
+                                <p><span className="text-gray-600">Remaining Balance:</span> ₱{parseFloat(ecaEdData.eca.remaining_balance).toFixed(2)}</p>
+                                <p><span className="text-gray-600">Status:</span> 
+                                  <span className="ml-1 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
+                                    {ecaEdData.eca.status}
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-white rounded-lg p-3 border">
+                              <h4 className="font-medium text-gray-900 mb-2">Emergency Cash Advance</h4>
+                              <p className="text-sm text-gray-600">No active ECA found</p>
+                            </div>
+                          )}
+
+                          {ecaEdData.has_active_ed ? (
+                            <div className="bg-white rounded-lg p-3 border">
+                              <h4 className="font-medium text-gray-900 mb-2">Active Emergency Deduction</h4>
+                              <div className="space-y-1 text-sm">
+                                <p><span className="text-gray-600">Deduction Amount:</span> ₱{parseFloat(ecaEdData.ed.amount).toFixed(2)}</p>
+                                <p><span className="text-gray-600">Status:</span> 
+                                  <span className="ml-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                                    {ecaEdData.ed.status}
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-white rounded-lg p-3 border">
+                              <h4 className="font-medium text-gray-900 mb-2">Emergency Deduction</h4>
+                              <p className="text-sm text-gray-600">No active ED found</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {isEcaEdReadonly && (
+                        <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
+                          <p className="text-sm text-blue-800">
+                            <AlertCircle className="h-4 w-4 inline mr-1" />
+                            ECA/ED fields are readonly until the emergency cash advance is fully paid.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Attendance Section - Different for Site vs Office */}
+                    {payrollType === 'Site' ? (
+                      // Site Payroll - Daily Attendance Grid
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Attendance</h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">Day</th>
+                                <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">Present</th>
+                                <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">OT (hrs)</th>
+                                <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">Late (mins)</th>
+                                <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">Site Address</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {days.map((day, index) => (
+                                <tr key={day} className="border-b border-gray-100">
+                                  <td className="py-2 px-3 text-sm font-medium text-gray-900">
+                                    {dayLabels[index]}
+                                  </td>
+                                  <td className="py-2 px-3 text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={formData.workingDays[day]}
+                                      onChange={() => handleCheckboxChange(day)}
+                                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                      disabled={isSubmitting}
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <input
+                                      type="number"
+                                      value={formData.overtime[day]}
+                                      onChange={(e) => handleInputChange(`overtime.${day}`, e.target.value)}
+                                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                      placeholder="0"
+                                      min="0"
+                                      step="0.5"
+                                      disabled={isSubmitting || !formData.workingDays[day]}
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <input
+                                      type="number"
+                                      value={formData.late[day]}
+                                      onChange={(e) => handleInputChange(`late.${day}`, e.target.value)}
+                                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                      placeholder="0"
+                                      min="0"
+                                      disabled={isSubmitting || !formData.workingDays[day]}
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <input
+                                      type="text"
+                                      value={formData.siteAddress[day]}
+                                      onChange={(e) => handleInputChange(`siteAddress.${day}`, e.target.value)}
+                                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                      placeholder="Site address"
+                                      disabled={isSubmitting || !formData.workingDays[day]}
+                                    />
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Summary Row */}
+                        <div className="mt-4 bg-blue-50 rounded-lg p-3">
+                          <div className="grid grid-cols-4 gap-4 text-center">
+                            <div>
+                              <p className="text-xs text-gray-600">Working Days</p>
+                              <p className="text-lg font-semibold text-blue-600">{calculations.workingDaysCount}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-600">Total OT</p>
+                              <p className="text-lg font-semibold text-green-600">{calculations.totalOT}h</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-600">Total Late</p>
+                              <p className="text-lg font-semibold text-red-600">{calculations.totalLate} mins</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-600">Basic Salary</p>
+                              <p className="text-lg font-semibold text-purple-600">₱{calculations.basicSalary}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      // Office Payroll - Total Input Fields
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Office Attendance Summary</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Total Working Days <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              value={formData.totalWorkingDays}
+                              onChange={(e) => handleInputChange('totalWorkingDays', e.target.value)}
+                              className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                              placeholder="0"
+                              min="0"
+                              max="31"
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Total Late (minutes) <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              value={formData.totalLateMinutes}
+                              onChange={(e) => handleInputChange('totalLateMinutes', e.target.value)}
+                              className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                              placeholder="0"
+                              min="0"
+                              step="0.01"
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Total Overtime (hours) <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              value={formData.totalOvertimeHours}
+                              onChange={(e) => handleInputChange('totalOvertimeHours', e.target.value)}
+                              className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                              placeholder="0"
+                              min="0"
+                              step="0.01"
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Deductions Section */}
                     <div className="bg-gray-50 rounded-lg p-4">
@@ -1204,6 +1070,22 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
 
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Others Deduction
+                          </label>
+                          <input
+                            type="number"
+                            value={formData.othersDeduction}
+                            onChange={(e) => handleInputChange('othersDeduction', e.target.value)}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                            placeholder="0.00"
+                            min="0"
+                            step="0.01"
+                            disabled={isSubmitting}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
                             Emergency Cash Advance
                           </label>
                           <input
@@ -1211,16 +1093,16 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                             value={formData.emergencyCashAdvance}
                             onChange={(e) => handleInputChange('emergencyCashAdvance', e.target.value)}
                             className={`w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none ${
-                              isEcaEdReadonly ? 'bg-gray-100 cursor-not-allowed' : ''
+                              ecaEdData?.has_active_eca ? 'bg-gray-100 cursor-not-allowed' : ''
                             }`}
                             placeholder="0.00"
                             min="0"
                             step="0.01"
-                            disabled={isSubmitting || isEcaEdReadonly}
+                            disabled={isSubmitting || ecaEdData?.has_active_eca}
                           />
-                          {isEcaEdReadonly && (
+                          {ecaEdData?.has_active_eca && (
                             <p className="text-xs text-gray-500 mt-1">
-                              Readonly - Employee has active ECA
+                              Employee already has active ECA
                             </p>
                           )}
                         </div>
@@ -1234,96 +1116,33 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                             value={formData.emergencyDeduction}
                             onChange={(e) => handleInputChange('emergencyDeduction', e.target.value)}
                             className={`w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none ${
-                              isEcaEdReadonly ? 'bg-gray-100 cursor-not-allowed' : ''
+                              ecaEdData?.has_active_ed ? 'bg-gray-100 cursor-not-allowed' : ''
                             }`}
                             placeholder="0.00"
                             min="0"
                             step="0.01"
-                            disabled={isSubmitting || isEcaEdReadonly}
+                            disabled={isSubmitting || ecaEdData?.has_active_ed}
                           />
-                          {isEcaEdReadonly && (
+                          {ecaEdData?.has_active_ed && (
                             <p className="text-xs text-gray-500 mt-1">
-                              Readonly - Employee has active ED
+                              Employee already has active ED
                             </p>
                           )}
                         </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Others
-                          </label>
-                          <input
-                            type="number"
-                            value={formData.othersDeduction}
-                            onChange={(e) => handleInputChange('othersDeduction', e.target.value)}
-                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-                            placeholder="0.00"
-                            min="0"
-                            step="0.01"
-                            disabled={isSubmitting}
-                          />
-                        </div>
                       </div>
 
-                      {/* Detailed Deduction Breakdown */}
-                      <div className="mt-4 bg-white rounded-lg p-4 border">
-                        <h4 className="text-md font-semibold text-gray-900 mb-3">Detailed Deduction Breakdown</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
-                          <div className="bg-red-50 rounded-lg p-3">
-                            <p className="text-xs text-gray-600 mb-1">Late Deduction</p>
-                            <p className="text-sm font-semibold text-red-600">₱{calculations.deductionBreakdown.lateDeduction}</p>
-                          </div>
-                          <div className="bg-orange-50 rounded-lg p-3">
-                            <p className="text-xs text-gray-600 mb-1">Cash Advance</p>
-                            <p className="text-sm font-semibold text-orange-600">₱{calculations.deductionBreakdown.cashAdvance}</p>
-                          </div>
-                          <div className="bg-yellow-50 rounded-lg p-3">
-                            <p className="text-xs text-gray-600 mb-1">Emergency CA</p>
-                            <p className="text-sm font-semibold text-yellow-600">₱{calculations.deductionBreakdown.emergencyCashAdvance}</p>
-                          </div>
-                          <div className="bg-purple-50 rounded-lg p-3">
-                            <p className="text-xs text-gray-600 mb-1">Emergency Ded.</p>
-                            <p className="text-sm font-semibold text-purple-600">₱{calculations.deductionBreakdown.emergencyDeduction}</p>
-                          </div>
-                          <div className="bg-gray-50 rounded-lg p-3">
-                            <p className="text-xs text-gray-600 mb-1">Others</p>
-                            <p className="text-sm font-semibold text-gray-600">₱{calculations.deductionBreakdown.othersDeduction}</p>
-                          </div>
+                      {(formData.emergencyCashAdvance && formData.emergencyDeduction) && (
+                        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm text-blue-800">
+                            <AlertCircle className="h-4 w-4 inline mr-1" />
+                            Creating new Emergency Cash Advance and Emergency Deduction for this employee.
+                          </p>
                         </div>
-                      </div>
-
-                      {/* Final Summary */}
-                      <div className="bg-green-50 rounded-lg p-4 mt-4">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Final Summary</h3>
-                        <div className="space-y-3">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Basic Salary:</span>
-                            <span className="font-medium">₱{calculations.basicSalary}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Overtime Pay:</span>
-                            <span className="font-medium text-green-600">₱{calculations.overtimePay}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Gross Pay:</span>
-                            <span className="font-medium">₱{calculations.grossPay}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Total Deductions:</span>
-                            <span className="font-medium text-red-600">₱{calculations.totalDeductions}</span>
-                          </div>
-                          <div className="border-t pt-2">
-                            <div className="flex justify-between text-xl font-bold">
-                              <span>Net Pay:</span>
-                              <span className="text-green-600">₱{calculations.netPay}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      )}
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex justify-between pt-6 border-t border-gray-200">
+                    {/* Submit Button */}
+                    <div className="flex justify-end space-x-3">
                       <Button
                         variant="outline"
                         onClick={() => setStep(1)}
@@ -1368,18 +1187,23 @@ const WorkersPayroll = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [departmentFilter, setDepartmentFilter] = useState('all')
-  const [groupFilter, setGroupFilter] = useState('All')
+  const [groupFilter, setGroupFilter] = useState('all')
   const [viewMode, setViewMode] = useState('card')
+  
+  // Modal states
   const [showProcessModal, setShowProcessModal] = useState(false)
-  const [showAttendanceModal, setShowAttendanceModal] = useState(false)
   const [showUpdateModal, setShowUpdateModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState(null)
+  
+  // Loading states
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
+  
+  // Success alert
   const [showSuccessAlert, setShowSuccessAlert] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
   // Fetch payroll records
   const fetchPayrollRecords = useCallback(async () => {
@@ -1387,140 +1211,164 @@ const WorkersPayroll = () => {
       setLoading(true)
       setError('')
       
-      const response = await fetch(`${API_BASE_URL}/payrolls`)
-      const data = await response.json()
+      // Fetch both site and office payrolls
+      const [siteResponse, officeResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/payrolls`),
+        fetch(`${API_BASE_URL}/office-payrolls`)
+      ])
       
-      if (data.success) {
-        setPayrollRecords(data.data || [])
-      } else {
-        setError(data.message || 'Failed to fetch payroll records')
+      const siteData = await siteResponse.json()
+      const officeData = await officeResponse.json()
+      
+      let allRecords = []
+      
+      if (siteData.success) {
+        const siteRecords = siteData.data.map(record => ({
+          ...record,
+          payroll_type: 'Site'
+        }))
+        allRecords = [...allRecords, ...siteRecords]
       }
+      
+      if (officeData.success) {
+        const officeRecords = officeData.data.map(record => ({
+          ...record,
+          payroll_type: 'Office'
+        }))
+        allRecords = [...allRecords, ...officeRecords]
+      }
+      
+      // Sort by created_at descending
+      allRecords.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      
+      setPayrollRecords(allRecords)
     } catch (error) {
       console.error('Error fetching payroll records:', error)
-      setError('Failed to fetch payroll records. Please check your connection.')
+      setError('Failed to fetch payroll records')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  // Load data on component mount
   useEffect(() => {
     fetchPayrollRecords()
   }, [fetchPayrollRecords])
 
   // Handle payroll submission
-  const handlePayrollSubmit = useCallback(async (payrollData) => {
+  const handlePayrollSubmit = useCallback(async (data, endpoint) => {
     try {
       setIsSubmitting(true)
-      console.log('Submitting payroll data:', payrollData)
       
-      const response = await fetch(`${API_BASE_URL}/payrolls`, {
+      const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payrollData)
+        body: JSON.stringify(data)
       })
       
-      const data = await response.json()
-      console.log('Response:', data)
+      const result = await response.json()
       
-      if (data.success) {
+      if (result.success) {
+        setShowProcessModal(false)
         setSuccessMessage('Payroll processed successfully!')
         setShowSuccessAlert(true)
-        setShowProcessModal(false)
-        fetchPayrollRecords() // Refresh the list
+        fetchPayrollRecords()
       } else {
-        setError(data.message || 'Failed to process payroll')
+        setError(result.message || 'Failed to process payroll')
       }
     } catch (error) {
       console.error('Error processing payroll:', error)
-      setError('Failed to process payroll. Please check your connection.')
+      setError('Failed to process payroll')
     } finally {
       setIsSubmitting(false)
     }
   }, [fetchPayrollRecords])
 
   // Handle record update
-  const handleUpdateRecord = useCallback(async (recordId, updateData) => {
+  const handleUpdateRecord = useCallback(async (id, data) => {
     try {
       setIsUpdating(true)
       
-      const response = await fetch(`${API_BASE_URL}/payrolls/${recordId}`, {
+      const record = payrollRecords.find(r => r.id === id)
+      const endpoint = record.payroll_type === 'Site' ? 'payrolls' : 'office-payrolls'
+      
+      const response = await fetch(`${API_BASE_URL}/${endpoint}/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updateData)
+        body: JSON.stringify(data)
       })
       
-      const data = await response.json()
+      const result = await response.json()
       
-      if (data.success) {
+      if (result.success) {
+        setShowUpdateModal(false)
         setSuccessMessage('Payroll record updated successfully!')
         setShowSuccessAlert(true)
-        setShowUpdateModal(false)
-        fetchPayrollRecords() // Refresh the list
+        fetchPayrollRecords()
       } else {
-        setError(data.message || 'Failed to update record')
+        setError(result.message || 'Failed to update payroll record')
       }
     } catch (error) {
-      console.error('Error updating record:', error)
-      setError('Failed to update record. Please check your connection.')
+      console.error('Error updating payroll record:', error)
+      setError('Failed to update payroll record')
     } finally {
       setIsUpdating(false)
     }
-  }, [fetchPayrollRecords])
+  }, [payrollRecords, fetchPayrollRecords])
 
   // Handle record deletion
   const handleDeleteRecord = useCallback(async () => {
     if (!selectedRecord) return
-
+    
     try {
       setIsDeleting(true)
       
-      const response = await fetch(`${API_BASE_URL}/payrolls/${selectedRecord.id}`, {
+      const endpoint = selectedRecord.payroll_type === 'Site' ? 'payrolls' : 'office-payrolls'
+      
+      const response = await fetch(`${API_BASE_URL}/${endpoint}/${selectedRecord.id}`, {
         method: 'DELETE'
       })
       
-      const data = await response.json()
+      const result = await response.json()
       
-      if (data.success) {
+      if (result.success) {
+        setShowDeleteModal(false)
         setSuccessMessage('Payroll record deleted successfully!')
         setShowSuccessAlert(true)
-        setShowDeleteModal(false)
-        setSelectedRecord(null)
-        fetchPayrollRecords() // Refresh the list
+        fetchPayrollRecords()
       } else {
-        setError(data.message || 'Failed to delete record')
+        setError(result.message || 'Failed to delete payroll record')
       }
     } catch (error) {
-      console.error('Error deleting record:', error)
-      setError('Failed to delete record. Please check your connection.')
+      console.error('Error deleting payroll record:', error)
+      setError('Failed to delete payroll record')
     } finally {
       setIsDeleting(false)
     }
   }, [selectedRecord, fetchPayrollRecords])
 
   const filteredRecords = useMemo(() => {
-  const lowercasedSearchTerm = searchTerm.toLowerCase();
+    const lowercasedSearchTerm = searchTerm.toLowerCase();
 
-  return payrollRecords.filter(record => {
-    const matchesSearch = searchTerm.trim() === '' ? true : (
-         (record.employee_name || '').toLowerCase().includes(lowercasedSearchTerm) ||
-         (record.employee_code || '').toLowerCase().includes(lowercasedSearchTerm) ||
-         (record.position || '').toLowerCase().includes(lowercasedSearchTerm) ||
-         (record.pay_period_start || '').toLowerCase().includes(lowercasedSearchTerm) ||
-         (record.pay_period_end || '').toLowerCase().includes(lowercasedSearchTerm)
-    );
-    
-    const matchesStatus = statusFilter === 'all' || record.status === statusFilter;
-    const matchesDepartment = departmentFilter === 'all' || record.payroll_type === departmentFilter;
-    const matchesGroup = groupFilter === 'all' || record.employee_group === groupFilter;
-    
-    return matchesSearch && matchesStatus && matchesDepartment && matchesGroup;
-  });
-}, [payrollRecords, searchTerm, statusFilter, departmentFilter, groupFilter]);
+    return payrollRecords.filter(record => {
+      const matchesSearch = searchTerm.trim() === '' ? true : (
+           (record.employee_name || '').toLowerCase().includes(lowercasedSearchTerm) ||
+           (record.employee_code || '').toLowerCase().includes(lowercasedSearchTerm) ||
+           (record.position || '').toLowerCase().includes(lowercasedSearchTerm) ||
+           (record.pay_period_start || '').toLowerCase().includes(lowercasedSearchTerm) ||
+           (record.pay_period_end || '').toLowerCase().includes(lowercasedSearchTerm)
+      );
+      
+      const matchesStatus = statusFilter === 'all' || record.status === statusFilter;
+      const matchesDepartment = departmentFilter === 'all' || record.payroll_type === departmentFilter;
+      const matchesGroup = groupFilter === 'all' || record.employee_group === groupFilter;
+      
+      return matchesSearch && matchesStatus && matchesDepartment && matchesGroup;
+    });
+  }, [payrollRecords, searchTerm, statusFilter, departmentFilter, groupFilter]);
 
   const summaryStats = useMemo(() => {
     const totalRecords = filteredRecords.length;
@@ -1538,7 +1386,6 @@ const WorkersPayroll = () => {
 
   const groups = [...new Set(payrollRecords.map(record => record.employee_group).filter(Boolean))]
 
-
   // Status options for dropdown
   const statusOptions = [
     { value: 'all', label: 'All Status' },
@@ -1554,6 +1401,7 @@ const WorkersPayroll = () => {
     { value: 'Site', label: 'Site' },
     { value: 'Office', label: 'Office' }
   ]
+  
   const groupOptions = [
     { value: 'all', label: 'All Groups' },
     ...groups.map(group => ({ value: group, label: group }))
@@ -1579,6 +1427,31 @@ const WorkersPayroll = () => {
     )
   })
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading payroll records...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={fetchPayrollRecords}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -1596,15 +1469,14 @@ const WorkersPayroll = () => {
             <p className="text-gray-600 mt-2">Monitor payroll records and payments</p>
           </div>
           <div className="flex items-center space-x-3 mt-4 md:mt-0">
-            {/* View Toggle Buttons with Smooth Transitions */}
+            {/* View Toggle Buttons */}
             <div className="flex items-center relative bg-white border border-gray-200 rounded-lg p-1 overflow-hidden">
-              {/* Animated Background */}
               <motion.div
                 className="absolute top-1 left-1 bottom-1 rounded-md bg-blue-600"
                 initial={false}
                 animate={{
-                  x: viewMode === 'card' ? 0 : 40, // adjust to match button width + spacing
-                  width: 38, // match button width including padding (px-3)
+                  x: viewMode === 'card' ? 0 : 40,
+                  width: 38,
                 }}
                 transition={{
                   type: "spring",
@@ -1613,7 +1485,6 @@ const WorkersPayroll = () => {
                 }}
               />
 
-              {/* Toggle Button - Card View */}
               <motion.button
                 onClick={() => setViewMode('card')}
                 className={`relative z-10 px-3 py-2 rounded-md transition-all duration-300 ${
@@ -1627,7 +1498,6 @@ const WorkersPayroll = () => {
                 <Grid3X3 className="h-4 w-4" />
               </motion.button>
 
-              {/* Toggle Button - Table View */}
               <motion.button
                 onClick={() => setViewMode('table')}
                 className={`relative z-10 px-3 py-2 rounded-md transition-all duration-300 ${
@@ -1697,292 +1567,300 @@ const WorkersPayroll = () => {
   initial={{ opacity: 0, y: 20 }}
   animate={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.5, delay: 0.3 }}
+  className="bg-white rounded-lg shadow-md p-6"
 >
-  <Card className="bg-white border-gray-200 shadow-md">
-    <CardContent className="p-6">
-      <div className="flex flex-wrap gap-4 items-center">
-        {/* Search */}
-        <div className="flex-1 min-w-[200px] relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600 h-4 w-4" />
-          <input
-            type="text"
-            placeholder="Search payroll records..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-          />
-        </div>
-
-        {/* Status Filter */}
-        <div className="w-[160px]">
-          <CustomDropdown
-            value={statusFilter}
-            onChange={setStatusFilter}
-            options={statusOptions}
-            placeholder="All Status"
-          />
-        </div>
-
-        {/* Department Filter (now fixed width) */}
-        <div className="w-[190px]">
-          <CustomDropdown
-            value={departmentFilter}
-            onChange={setDepartmentFilter}
-            options={departmentOptions}
-            placeholder="All Departments"
-          />
-        </div>
-
-        {/* Group Filter */}
-        <div className="w-[160px]">
-        <CustomDropdown
-                    value={groupFilter}
-                    onChange={setGroupFilter}
-                    options={groupOptions}
-                    placeholder="All Groups"
-                  />
-        </div>
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+    {/* Search Field */}
+    <div className="lg:col-span-2 flex flex-col">
+      <label className="text-sm font-medium mb-1">Search</label>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <input
+          type="text"
+          placeholder="Search employees, codes, positions..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+        />
       </div>
-    </CardContent>
-  </Card>
+    </div>
+
+    {/* Status */}
+    <div className="flex flex-col">
+      <label className="text-sm font-medium mb-1">Status</label>
+      <CustomDropdown
+        value={statusFilter}
+        onChange={setStatusFilter}
+        options={statusOptions}
+        placeholder="All Status"
+      />
+    </div>
+
+    {/* Department */}
+    <div className="flex flex-col">
+      <label className="text-sm font-medium mb-1">Department</label>
+      <CustomDropdown
+        value={departmentFilter}
+        onChange={setDepartmentFilter}
+        options={departmentOptions}
+        placeholder="All Departments"
+      />
+    </div>
+
+    {/* Group */}
+    <div className="flex flex-col">
+      <label className="text-sm font-medium mb-1">Group</label>
+      <CustomDropdown
+        value={groupFilter}
+        onChange={setGroupFilter}
+        options={groupOptions}
+        placeholder="All Groups"
+      />
+    </div>
+  </div>
 </motion.div>
 
 
-        {/* Payroll Records with Smooth View Transitions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Payroll Records</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                <span className="ml-2 text-gray-600">Loading payroll records...</span>
-              </div>
-            ) : filteredRecords.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No payroll records found</h3>
-                <p className="text-gray-600">Start by processing your first payroll record.</p>
-              </div>
-            ) : (
-              <AnimatePresence mode="wait">
-                {viewMode === 'card' ? (
-                  <motion.div
-                    key="card-view"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                    className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"
-                  >
-                    {filteredRecords.map((record, index) => (
-                      <motion.div
-                        key={record.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}
-                        whileHover={{ scale: 1.01 }}
-                        className="group"
+        {/* Records Display */}
+        {viewMode === 'card' ? (
+          // Card View
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredRecords.map((record, index) => (
+              <motion.div
+                key={record.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                whileHover={{ scale: 1.02 }}
+              >
+                <Card className="bg-white border-gray-200 hover:border-blue-500 transition-colors shadow-md">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className={`p-2 rounded-lg ${record.payroll_type === 'Site' ? 'bg-orange-100' : 'bg-blue-100'}`}>
+                          {record.payroll_type === 'Site' ? (
+                            <HardHat className={`h-4 w-4 ${record.payroll_type === 'Site' ? 'text-orange-600' : 'text-blue-600'}`} />
+                          ) : (
+                            <Building className={`h-4 w-4 ${record.payroll_type === 'Site' ? 'text-orange-600' : 'text-blue-600'}`} />
+                          )}
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{record.employee_name}</CardTitle>
+                          <p className="text-sm text-gray-600">{record.employee_code} • {record.position}</p>
+                        </div>
+                      </div>
+                      <StatusBadge status={record.status} />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Pay Period:</span>
+                        <span className="font-medium">{record.pay_period_start} to {record.pay_period_end}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Department:</span>
+                        <span className="font-medium">{record.payroll_type}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Group:</span>
+                        <span className="font-medium">{record.employee_group}</span>
+                      </div>
+                      {record.payroll_type === 'Site' ? (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Working Days:</span>
+                          <span className="font-medium">{record.working_days}</span>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Working Days:</span>
+                          <span className="font-medium">{record.total_working_days}</span>
+                        </div>
+                      )}
+                      <div className="border-t pt-3">
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-600">Gross Pay:</span>
+                          <span className="font-medium text-green-600">₱{parseFloat(record.gross_pay).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-600">Overtime Pay:</span>
+                          <span className="font-medium text-green-600">₱{parseFloat(record.overtime_pay).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-600">Cash Advance:</span>
+                          <span className="font-medium text-red-600">₱{parseFloat(record.cash_advance).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-600">Late:</span>
+                          <span className="font-medium text-red-600">₱{parseFloat(record.late_deduction).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-600">Deductions:</span>
+                          <span className="font-medium text-red-600">₱{parseFloat(record.total_deductions).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-lg font-bold">
+                          <span>Net Pay:</span>
+                          <span className="text-blue-600">₱{parseFloat(record.net_pay).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end space-x-2 mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedRecord(record)
+                          setShowUpdateModal(true)
+                        }}
                       >
-                        <Card className="bg-white border-gray-200 hover:border-blue-500 transition-all duration-300 shadow-md">
-                          <CardContent className="p-6">
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-1">{record.employee_name}</h3>
-                                <p className="text-sm text-gray-700 mb-1">{record.position}</p>
-                                <p className="text-xs text-gray-500">{record.employee_code} • {record.payroll_type}</p>
-                              </div>
-                              <StatusBadge status={record.status} />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                              <div className="space-y-2">
-                                <div className="text-sm">
-                                  <span className="text-gray-600">Pay Period:</span>
-                                  <p className="text-gray-900 text-xs">{record.pay_period_start} to {record.pay_period_end}</p>
-                                </div>
-                                <div className="text-sm">
-                                  <span className="text-gray-600">Working Days:</span>
-                                  <p className="text-gray-900">{record.working_days}</p>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <div className="text-sm">
-                                  <span className="text-gray-600">Overtime:</span>
-                                  <p className="text-gray-900">{record.overtime_hours}h</p>
-                                </div>
-                                <div className="text-sm">
-                                  <span className="text-gray-600">Late:</span>
-                                  <p className="text-gray-900">{record.late_minutes} mins</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                              <div className="grid grid-cols-3 gap-4 text-center">
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">Gross Pay</p>
-                                  <p className="text-lg font-semibold text-blue-600">₱{(parseFloat(record.gross_pay) || 0).toFixed(2)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">Deductions</p>
-                                  <p className="text-lg font-semibold text-red-600">-₱{(parseFloat(record.total_deductions) || 0).toFixed(2)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">Net Pay</p>
-                                  <p className="text-lg font-semibold text-green-600">₱{(parseFloat(record.net_pay) || 0).toFixed(2)}</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              <div className="flex space-x-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedRecord(record)
-                                    setShowAttendanceModal(true)
-                                  }}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedRecord(record)
-                                    setShowUpdateModal(true)
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedRecord(record)
-                                    setShowDeleteModal(true)
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="table-view"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                    className="overflow-x-auto"
-                  >
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Group</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Employee</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Department</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Pay Period</th>
-                          <th className="text-right py-3 px-4 text-sm font-medium text-gray-700">Gross Pay</th>
-                          <th className="text-right py-3 px-4 text-sm font-medium text-gray-700">Deductions</th>
-                          <th className="text-right py-3 px-4 text-sm font-medium text-gray-700">Net Pay</th>
-                          <th className="text-center py-3 px-4 text-sm font-medium text-gray-700">Status</th>
-                          <th className="text-center py-3 px-4 text-sm font-medium text-gray-700">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredRecords.map((record, index) => (
-                          <motion.tr
-                            key={record.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                            className="border-b border-gray-100 hover:bg-gray-50"
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedRecord(record)
+                          setShowDeleteModal(true)
+                        }}
+                        className="text-red-600 hover:text-red-700 hover:border-red-300"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          // Table View
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="bg-white rounded-lg shadow-md overflow-hidden"
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pay Period</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Working Days</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gross Pay</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Net Pay</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredRecords.map((record, index) => (
+                    <motion.tr
+                      key={record.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.05 }}
+                      className="hover:bg-gray-50"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className={`p-2 rounded-lg mr-3 ${record.payroll_type === 'Site' ? 'bg-orange-100' : 'bg-blue-100'}`}>
+                            {record.payroll_type === 'Site' ? (
+                              <HardHat className={`h-4 w-4 ${record.payroll_type === 'Site' ? 'text-orange-600' : 'text-blue-600'}`} />
+                            ) : (
+                              <Building className={`h-4 w-4 ${record.payroll_type === 'Site' ? 'text-orange-600' : 'text-blue-600'}`} />
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{record.employee_name}</div>
+                            <div className="text-sm text-gray-500">{record.employee_code} • {record.position}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          record.payroll_type === 'Site' 
+                            ? 'bg-orange-100 text-orange-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {record.payroll_type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {record.pay_period_start} to {record.pay_period_end}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {record.payroll_type === 'Site' ? record.working_days : record.total_working_days}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                        ₱{parseFloat(record.gross_pay).toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                        ₱{parseFloat(record.net_pay).toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StatusBadge status={record.status} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedRecord(record)
+                              setShowUpdateModal(true)
+                            }}
                           >
-                          <td className="py-3 px-4">
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">{record.employee_group}</p>
-                              </div>
-                            </td>
-                            <td className="py-3 px-4">
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">{record.employee_name}</p>
-                                <p className="text-xs text-gray-500">{record.employee_code} • {record.position}</p>
-                              </div>
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                record.payroll_type === 'Site' 
-                                  ? 'bg-blue-100 text-blue-800' 
-                                  : 'bg-green-100 text-green-800'
-                              }`}>
-                                {record.payroll_type}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-sm text-gray-900">{record.pay_period_start} to {record.pay_period_end}</td>
-                            <td className="py-3 px-4 text-sm text-gray-900 text-right">₱{(parseFloat(record.gross_pay) || 0).toFixed(2)}</td>
-                            <td className="py-3 px-4 text-sm text-red-600 text-right">
-                              ₱{(parseFloat(record.total_deductions) || 0).toFixed(2)}
-                            </td>
-                            <td className="py-3 px-4 text-sm font-medium text-green-600 text-right">₱{(parseFloat(record.net_pay) || 0).toFixed(2)}</td>
-                            <td className="py-3 px-4 text-center">
-                              <StatusBadge status={record.status} />
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="flex items-center justify-center space-x-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedRecord(record)
-                                    setShowAttendanceModal(true)
-                                  }}
-                                  className="text-blue-600 hover:text-blue-800"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedRecord(record)
-                                    setShowUpdateModal(true)
-                                  }}
-                                  className="text-gray-600 hover:text-gray-800"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedRecord(record)
-                                    setShowDeleteModal(true)
-                                  }}
-                                  className="text-red-600 hover:text-red-800"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </td>
-                          </motion.tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            )}
-          </CardContent>
-        </Card>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedRecord(record)
+                              setShowDeleteModal(true)
+                            }}
+                            className="text-red-600 hover:text-red-700 hover:border-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+
+        {filteredRecords.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-center py-12"
+          >
+            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No payroll records found</h3>
+            <p className="text-gray-600 mb-4">
+              {searchTerm || statusFilter !== 'all' || departmentFilter !== 'all' || groupFilter !== 'all'
+                ? 'Try adjusting your search or filters'
+                : 'Start by processing your first payroll'}
+            </p>
+            <Button
+              onClick={() => setShowProcessModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Process Payroll
+            </Button>
+          </motion.div>
+        )}
       </div>
 
       {/* Modals */}
@@ -1991,12 +1869,6 @@ const WorkersPayroll = () => {
         onClose={() => setShowProcessModal(false)}
         onSubmit={handlePayrollSubmit}
         isSubmitting={isSubmitting}
-      />
-
-      <AttendanceDetailModal
-        isOpen={showAttendanceModal}
-        onClose={() => setShowAttendanceModal(false)}
-        record={selectedRecord}
       />
 
       <UpdatePayrollModal

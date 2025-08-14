@@ -17,7 +17,7 @@ return new class extends Migration
             $table->date("lto_renewal_date");
             $table->text("description")->nullable();
             $table->string("status")->default("pending"); // pending, complete
-            $table->json("images")->nullable(); // Store image paths as JSON array
+            $table->longText("images")->nullable(); // Changed to longText to store base64 encoded images like RFI
             $table->timestamps();
         });
     }

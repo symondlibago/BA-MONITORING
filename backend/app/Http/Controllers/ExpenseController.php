@@ -5,79 +5,112 @@ namespace App\Http\Controllers;
 use App\Models\Expense;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 class ExpenseController extends Controller
 {
-    public function __construct()
+    /**
+     * Validation rules for expenses.
+     */
+    private function validationRules(bool $isUpdate = false): array
     {
-        // Add CORS headers to all responses
-
+        return [
+            'date' => ($isUpdate ? 'sometimes|' : '') . 'nullable|date',
+            'or_si_no' => 'nullable|string|max:255',
+            'description' => ($isUpdate ? 'sometimes|' : '') . 'required|string',
+            'location' => 'nullable|string|max:255',
+            'store' => 'nullable|string|max:255',
+            'quantity' => 'nullable|string|max:255',
+            'size_dimension' => 'nullable|string|max:255',
+            'unit_price' => 'nullable|numeric|min:0',
+            'total_price' => ($isUpdate ? 'sometimes|' : '') . 'required|numeric|min:0',
+            'mop' => 'nullable|string|max:255',
+            'mop_description' => 'nullable|string|max:255',
+            'category' => 'nullable|string|max:255',
+            'images' => 'nullable|array|max:10',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif',
+        ];
     }
 
     /**
-     * Display a listing of the resource.
+     * Handle image uploads and return structured data.
+     */
+    private function processImages($images): array
+    {
+        $data = [];
+        foreach ($images as $image) {
+            $content = file_get_contents($image->getRealPath());
+            $data[] = [
+                'data'          => base64_encode($content),
+                'mime_type'     => $image->getMimeType(),
+                'original_name' => $image->getClientOriginalName(),
+                'size'          => strlen($content)
+            ];
+        }
+        return $data;
+    }
+
+    /**
+     * Return a JSON error response.
+     */
+    private function errorResponse(string $message, \Throwable $e, int $status = 500)
+    {
+        return response()->json([
+            'success' => false,
+            'message' => $message,
+            'error'   => $e->getMessage()
+        ], $status);
+    }
+
+    /**
+     * Get all expenses
      */
     public function index(): JsonResponse
     {
         try {
             $expenses = Expense::orderBy('created_at', 'desc')->get();
-            
             return response()->json([
                 'success' => true,
                 'data' => $expenses
             ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to fetch expenses: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch expenses',
-                'error' => $e->getMessage()
-            ], 500);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to fetch expenses', $e);
         }
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store a new expense
      */
     public function store(Request $request): JsonResponse
     {
         try {
-            Log::info('Expense store request received', $request->all());
-
-            $validatedData = $request->validate([
-                'date' => 'nullable|date',
-                'or_si_no' => 'nullable|string|max:255',
-                'description' => 'required|string',
-                'location' => 'nullable|string|max:255',
-                'store' => 'nullable|string|max:255',
-                'quantity' => 'nullable|string|max:255', // Changed to string
-                'size_dimension' => 'nullable|string|max:255',
-                'unit_price' => 'nullable|numeric|min:0',
-                'total_price' => 'nullable|numeric|min:0',
-                'mop' => 'nullable|string|in:PDC,PO,CARD', // Mode of payment validation
-                'mop_description' => 'nullable|string|max:500', // MOP description
-                'category' => 'nullable|string|max:255',
-                'images' => 'nullable|array|max:10', // Maximum 10 images
-                'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:20480' // Each image validation
-            ]);
-
-            // Handle image uploads
-            $imagePaths = [];
-            if ($request->hasFile('images')) {
-                foreach ($request->file('images') as $image) {
-                    $path = $image->store('expenses', 'public');
-                    $imagePaths[] = $path;
-                }
+            $validator = Validator::make($request->all(), $this->validationRules());
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors()
+                ], 422);
             }
-            
-            $validatedData['images'] = $imagePaths;
 
-            $expense = Expense::create($validatedData);
+            $imageData = $request->hasFile('images') 
+                ? $this->processImages($request->file('images'))
+                : [];
 
-            Log::info('Expense created successfully', ['id' => $expense->id]);
+            $expense = Expense::create([
+                'date' => $request->date,
+                'or_si_no' => $request->or_si_no,
+                'description' => $request->description,
+                'location' => $request->location,
+                'store' => $request->store,
+                'quantity' => $request->quantity,
+                'size_dimension' => $request->size_dimension,
+                'unit_price' => $request->unit_price,
+                'total_price' => $request->total_price,
+                'mop' => $request->mop,
+                'mop_description' => $request->mop_description,
+                'category' => $request->category,
+                'images' => json_encode($imageData),
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -85,149 +118,260 @@ class ExpenseController extends Controller
                 'data' => $expense
             ], 201);
 
-        } catch (ValidationException $e) {
-            Log::error('Validation failed for expense creation', $e->errors());
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (\Exception $e) {
-            Log::error('Failed to create expense: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create expense',
-                'error' => $e->getMessage()
-            ], 500);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to create expense', $e);
         }
     }
 
     /**
-     * Display the specified resource.
+     * Show a specific expense
      */
-    public function show(string $id): JsonResponse
+    public function show($id): JsonResponse
     {
         try {
-            $expense = Expense::findOrFail($id);
-            
+            $expense = Expense::find($id);
+
+            if (!$expense) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Expense not found'
+                ], 404);
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => $expense
             ]);
-        } catch (\Exception $e) {
-            Log::error('Expense not found: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Expense not found',
-                'error' => $e->getMessage()
-            ], 404);
+
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to fetch expense', $e);
         }
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update an expense
      */
-    public function update(Request $request, string $id): JsonResponse
+    public function update(Request $request, $id): JsonResponse
     {
         try {
-            Log::info('Expense update request received', ['id' => $id, 'data' => $request->all()]);
-
-            $expense = Expense::findOrFail($id);
-            
-            $validatedData = $request->validate([
-                'date' => 'nullable|date',
-                'or_si_no' => 'nullable|string|max:255',
-                'description' => 'required|string',
-                'location' => 'nullable|string|max:255',
-                'store' => 'nullable|string|max:255',
-                'quantity' => 'nullable|string|max:255', // Changed to string
-                'size_dimension' => 'nullable|string|max:255',
-                'unit_price' => 'nullable|numeric|min:0',
-                'total_price' => 'required|numeric|min:0',
-                'mop' => 'nullable|string|in:PDC,PO,CARD', // Mode of payment validation
-                'mop_description' => 'nullable|string|max:500', // MOP description
-                'category' => 'nullable|string|max:255',
-                'images' => 'nullable|array|max:10', // Maximum 10 images
-                'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:20480' // Each image validation
-            ]);
-
-            // Handle image uploads
-            if ($request->hasFile('images')) {
-                // Delete old images if they exist
-                if ($expense->images) {
-                    foreach ($expense->images as $oldImage) {
-                        Storage::disk('public')->delete($oldImage);
-                    }
-                }
-                
-                // Upload new images
-                $imagePaths = [];
-                foreach ($request->file('images') as $image) {
-                    $path = $image->store('expenses', 'public');
-                    $imagePaths[] = $path;
-                }
-                $validatedData['images'] = $imagePaths;
+            $validator = Validator::make($request->all(), $this->validationRules(true));
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors()
+                ], 422);
             }
 
-            $expense->update($validatedData);
+            $expense = Expense::find($id);
 
-            Log::info('Expense updated successfully', ['id' => $expense->id]);
+            if (!$expense) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Expense not found'
+                ], 404);
+            }
+
+            // Handle images - only update if new images are uploaded
+            $imageData = null;
+            if ($request->hasFile('images')) {
+                // New images uploaded, replace existing ones
+                $imageData = $this->processImages($request->file('images'));
+            } else {
+                // No new images, keep existing ones
+                $imageData = is_string($expense->images) ? json_decode($expense->images, true) : $expense->images;
+            }
+
+            // Prepare update data - only include fields that are provided
+            $updateData = [];
+            
+            if ($request->has('date')) {
+                $updateData['date'] = $request->date;
+            }
+            
+            if ($request->has('or_si_no')) {
+                $updateData['or_si_no'] = $request->or_si_no;
+            }
+            
+            if ($request->has('description')) {
+                $updateData['description'] = $request->description;
+            }
+            
+            if ($request->has('location')) {
+                $updateData['location'] = $request->location;
+            }
+            
+            if ($request->has('store')) {
+                $updateData['store'] = $request->store;
+            }
+            
+            if ($request->has('quantity')) {
+                $updateData['quantity'] = $request->quantity;
+            }
+            
+            if ($request->has('size_dimension')) {
+                $updateData['size_dimension'] = $request->size_dimension;
+            }
+            
+            if ($request->has('unit_price')) {
+                $updateData['unit_price'] = $request->unit_price;
+            }
+            
+            if ($request->has('total_price')) {
+                $updateData['total_price'] = $request->total_price;
+            }
+            
+            if ($request->has('mop')) {
+                $updateData['mop'] = $request->mop;
+            }
+            
+            if ($request->has('mop_description')) {
+                $updateData['mop_description'] = $request->mop_description;
+            }
+            
+            if ($request->has('category')) {
+                $updateData['category'] = $request->category;
+            }
+            
+            // Always update images (either new ones or existing ones)
+            $updateData['images'] = json_encode($imageData);
+
+            $expense->update($updateData);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Expense updated successfully',
-                'data' => $expense
+                'data' => $expense->fresh()
             ]);
 
-        } catch (ValidationException $e) {
-            Log::error('Validation failed for expense update', $e->errors());
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (\Exception $e) {
-            Log::error('Failed to update expense: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update expense',
-                'error' => $e->getMessage()
-            ], 500);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to update expense', $e);
         }
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Delete an expense
      */
-    public function destroy(string $id): JsonResponse
+    public function destroy($id): JsonResponse
     {
         try {
-            Log::info('Expense delete request received', ['id' => $id]);
+            $expense = Expense::find($id);
 
-            $expense = Expense::findOrFail($id);
-            
-            // Delete associated images
-            if ($expense->images) {
-                foreach ($expense->images as $image) {
-                    Storage::disk('public')->delete($image);
-                }
+            if (!$expense) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Expense not found'
+                ], 404);
             }
-            
-            $expense->delete();
 
-            Log::info('Expense deleted successfully', ['id' => $id]);
+            // No need to delete files from storage since images are stored in database
+            $expense->delete();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Expense deleted successfully'
             ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to delete expense: ' . $e->getMessage());
+
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to delete expense', $e);
+        }
+    }
+
+    /**
+     * Serve an image from the database
+     */
+    public function getImage($id, $imageIndex)
+    {
+        try {
+            $expense = Expense::find($id);
+
+            if (!$expense) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Expense not found'
+                ], 404);
+            }
+
+            $images = is_string($expense->images) ? json_decode($expense->images, true) : $expense->images;
+            
+            if (!is_array($images) || !isset($images[$imageIndex])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Image not found'
+                ], 404);
+            }
+
+            $image = $images[$imageIndex];
+            
+            if (!isset($image['data']) || !isset($image['mime_type'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid image data'
+                ], 404);
+            }
+
+            $imageData = base64_decode($image['data']);
+            
+            return response($imageData)
+                ->header('Content-Type', $image['mime_type'])
+                ->header('Content-Length', strlen($imageData))
+                ->header('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete expense',
+                'message' => 'Failed to retrieve image',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Get expenses by category
+     */
+    public function getByCategory($category): JsonResponse
+    {
+        try {
+            $expenses = Expense::where('category', $category)
+                              ->orderBy('created_at', 'desc')
+                              ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $expenses
+            ]);
+
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to fetch expenses by category', $e);
+        }
+    }
+
+    /**
+     * Search expenses
+     */
+    public function search(Request $request): JsonResponse
+    {
+        try {
+            $query = $request->get('q', '');
+
+            if (empty($query)) {
+                $expenses = Expense::orderBy('created_at', 'desc')->get();
+            } else {
+                $expenses = Expense::where('description', 'LIKE', '%' . $query . '%')
+                                  ->orWhere('location', 'LIKE', '%' . $query . '%')
+                                  ->orWhere('store', 'LIKE', '%' . $query . '%')
+                                  ->orWhere('category', 'LIKE', '%' . $query . '%')
+                                  ->orWhere('or_si_no', 'LIKE', '%' . $query . '%')
+                                  ->orderBy('created_at', 'desc')
+                                  ->get();
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $expenses
+            ]);
+
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to search expenses', $e);
         }
     }
 }

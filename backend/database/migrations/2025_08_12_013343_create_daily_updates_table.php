@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('weather')->nullable();
             $table->integer('manpower')->nullable();
             $table->text('activity');
-            $table->json('images')->nullable(); // Store array of image paths
+            $table->longText('images')->nullable();
             $table->timestamps();
         });
     }

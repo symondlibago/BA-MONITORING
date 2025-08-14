@@ -96,7 +96,7 @@ function ImageGalleryModal({ isOpen, onClose, images, initialIndex = 0 }) {
 
           {/* Image */}
           <img
-            src={`${API_BASE_URL.replace('/api', '')}/storage/${images[currentIndex]}`}
+            src={images[currentIndex]}
             alt={`Image ${currentIndex + 1}`}
             className="max-w-full max-h-full object-contain"
           />
@@ -341,8 +341,8 @@ function DailyUpdateModal({ isOpen, onClose, onSubmit, initialData, projectId })
       const activityList = initialData.activity ? initialData.activity.split('\n').filter(a => a.trim()) : ['']
       setActivities(activityList.length > 0 ? activityList : [''])
       
-      // Set existing images
-      setExistingImages(initialData.images || [])
+      // Set existing images from image_data_urls
+      setExistingImages(initialData.image_data_urls || [])
     } else {
       setFormData({
         date: new Date().toISOString().split('T')[0],
@@ -486,16 +486,16 @@ function DailyUpdateModal({ isOpen, onClose, onSubmit, initialData, projectId })
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Existing Images Display (for edit mode) */}
-              {initialData && existingImages.length > 0 && (
+              {initialData && initialData.image_data_urls && initialData.image_data_urls.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
                     Current Images
                   </label>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-                    {existingImages.map((image, index) => (
+                    {initialData.image_data_urls.map((imageUrl, index) => (
                       <div key={index} className="relative">
                         <img
-                          src={`${API_BASE_URL.replace('/api', '')}/storage/${image}`}
+                          src={imageUrl}
                           alt={`Existing ${index + 1}`}
                           className="w-full h-20 object-cover rounded"
                         />
@@ -1422,30 +1422,30 @@ function SiteOperation() {
                                                   </div>
                                                 </div>
                                                 
-                                                {update.images && update.images.length > 0 && (
+                                                {update.image_data_urls && update.image_data_urls.length > 0 && (
                                                   <div className="flex items-center space-x-2">
                                                     <div className="relative">
                                                       <img
-                                                        src={`${API_BASE_URL.replace('/api', '')}/storage/${update.images[0]}`}
+                                                        src={update.image_data_urls[0]}
                                                         alt="Daily update"
                                                         className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
-                                                        onClick={() => handleImageClick(update.images, 0)}
+                                                        onClick={() => handleImageClick(update.image_data_urls, 0)}
                                                       />
-                                                      {update.images.length > 1 && (
+                                                      {update.image_data_urls.length > 1 && (
                                                         <div className="absolute -top-2 -right-2 bg-[var(--color-primary)] text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
-                                                          +{update.images.length - 1}
+                                                          +{update.image_data_urls.length - 1}
                                                         </div>
                                                       )}
                                                     </div>
-                                                    {update.images.length > 1 && (
+                                                    {update.image_data_urls.length > 1 && (
                                                       <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => handleImageClick(update.images, 0)}
+                                                        onClick={() => handleImageClick(update.image_data_urls, 0)}
                                                         className="text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 hover:text-[var(--color-primary)]"
                                                       >
                                                         <ZoomIn className="h-4 w-4 mr-2" />
-                                                        View All ({update.images.length})
+                                                        View All ({update.image_data_urls.length})
                                                       </Button>
                                                     )}
                                                   </div>

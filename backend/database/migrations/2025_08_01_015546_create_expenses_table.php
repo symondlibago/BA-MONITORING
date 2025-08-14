@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('mop'); // Mode of payment
             $table->text('mop_description')->nullable(); // MOP description
             $table->string('category');
-            $table->json('images')->nullable(); // Store multiple image paths as JSON
+            $table->longText('images')->nullable();
             $table->timestamps();
         });
     }

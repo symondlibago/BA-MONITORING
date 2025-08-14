@@ -16,7 +16,7 @@ return new class extends Migration
             $table->text('description');
             $table->date('date');
             $table->enum('status', ['pending', 'approved', 'reject'])->default('pending');
-            $table->json('images')->nullable();
+            $table->longText('images')->nullable(); // Changed to longText to store base64 encoded images
             $table->timestamps();
         });
     }

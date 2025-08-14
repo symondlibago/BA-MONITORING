@@ -5,12 +5,55 @@ namespace App\Http\Controllers;
 use App\Models\Vehicle;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 
 class VehicleController extends Controller
 {
+    /**
+     * Validation rules for vehicles.
+     */
+    private function validationRules(bool $isUpdate = false): array
+    {
+        return [
+            'vehicle_name' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
+            'lto_renewal_date' => ($isUpdate ? 'sometimes|' : '') . 'required|date',
+            'description' => 'nullable|string',
+            'status' => ($isUpdate ? 'sometimes|' : '') . 'nullable|in:pending,complete',
+            'images' => 'nullable|array|max:10',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif', // No size limit
+        ];
+    }
+
+    /**
+     * Handle image uploads and return structured data.
+     */
+    private function processImages($images): array
+    {
+        $data = [];
+        foreach ($images as $image) {
+            $content = file_get_contents($image->getRealPath());
+            $data[] = [
+                'data'          => base64_encode($content),
+                'mime_type'     => $image->getMimeType(),
+                'original_name' => $image->getClientOriginalName(),
+                'size'          => strlen($content)
+            ];
+        }
+        return $data;
+    }
+
+    /**
+     * Return a JSON error response.
+     */
+    private function errorResponse(string $message, \Throwable $e, int $status = 500)
+    {
+        return response()->json([
+            'success' => false,
+            'message' => $message,
+            'error'   => $e->getMessage()
+        ], $status);
+    }
+
     /**
      * Get all vehicles
      */
@@ -22,12 +65,8 @@ class VehicleController extends Controller
                 'success' => true,
                 'data' => $vehicles
             ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch vehicles',
-                'error' => $e->getMessage()
-            ], 500);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to fetch vehicles', $e);
         }
     }
 
@@ -37,39 +76,24 @@ class VehicleController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'vehicle_name' => 'required|string|max:255',
-                'lto_renewal_date' => 'required|date',
-                'description' => 'nullable|string',
-                'status' => 'nullable|in:pending,complete',
-                'images' => 'nullable|array',
-                'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048'
-            ]);
-
+            $validator = Validator::make($request->all(), $this->validationRules());
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validation failed',
                     'errors' => $validator->errors()
                 ], 422);
             }
 
-            // Handle image uploads
-            $imagePaths = [];
-            if ($request->hasFile('images')) {
-                foreach ($request->file('images') as $image) {
-                    $filename = time() . '_' . Str::random(10) . '.' . $image->getClientOriginalExtension();
-                    $path = $image->storeAs('vehicles', $filename, 'public');
-                    $imagePaths[] = $path;
-                }
-            }
+            $imageData = $request->hasFile('images') 
+                ? $this->processImages($request->file('images'))
+                : [];
 
             $vehicle = Vehicle::create([
                 'vehicle_name' => $request->vehicle_name,
                 'lto_renewal_date' => $request->lto_renewal_date,
                 'description' => $request->description ?? '',
                 'status' => $request->status ?? 'pending',
-                'images' => $imagePaths,
+                'images' => json_encode($imageData),
             ]);
 
             return response()->json([
@@ -78,12 +102,8 @@ class VehicleController extends Controller
                 'data' => $vehicle
             ], 201);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create vehicle',
-                'error' => $e->getMessage()
-            ], 500);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to create vehicle', $e);
         }
     }
 
@@ -107,12 +127,8 @@ class VehicleController extends Controller
                 'data' => $vehicle
             ]);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch vehicle',
-                'error' => $e->getMessage()
-            ], 500);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to fetch vehicle', $e);
         }
     }
 
@@ -122,19 +138,10 @@ class VehicleController extends Controller
     public function update(Request $request, $id): JsonResponse
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'vehicle_name' => 'sometimes|required|string|max:255',
-                'lto_renewal_date' => 'sometimes|required|date',
-                'description' => 'nullable|string',
-                'status' => 'sometimes|required|in:pending,complete',
-                'images' => 'nullable|array',
-                'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048'
-            ]);
-
+            $validator = Validator::make($request->all(), $this->validationRules(true));
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validation failed',
                     'errors' => $validator->errors()
                 ], 422);
             }
@@ -148,33 +155,39 @@ class VehicleController extends Controller
                 ], 404);
             }
 
-            // Handle image uploads
-            $imagePaths = $vehicle->images ?? [];
+            // Handle images - only update if new images are uploaded
+            $imageData = null;
             if ($request->hasFile('images')) {
-                // Delete old images
-                if ($vehicle->images) {
-                    foreach ($vehicle->images as $oldPath) {
-                        Storage::disk('public')->delete($oldPath);
-                    }
-                }
-                
-                // Upload new images
-                $imagePaths = [];
-                foreach ($request->file('images') as $image) {
-                    $filename = time() . '_' . Str::random(10) . '.' . $image->getClientOriginalExtension();
-                    $path = $image->storeAs('vehicles', $filename, 'public');
-                    $imagePaths[] = $path;
-                }
+                // New images uploaded, replace existing ones
+                $imageData = $this->processImages($request->file('images'));
+            } else {
+                // No new images, keep existing ones
+                $imageData = is_string($vehicle->images) ? json_decode($vehicle->images, true) : $vehicle->images;
             }
 
-            // Update vehicle data
-            $vehicle->update([
-                'vehicle_name' => $request->vehicle_name ?? $vehicle->vehicle_name,
-                'lto_renewal_date' => $request->lto_renewal_date ?? $vehicle->lto_renewal_date,
-                'description' => $request->description ?? $vehicle->description,
-                'status' => $request->status ?? $vehicle->status,
-                'images' => $imagePaths,
-            ]);
+            // Prepare update data - only include fields that are provided
+            $updateData = [];
+            
+            if ($request->has('vehicle_name')) {
+                $updateData['vehicle_name'] = $request->vehicle_name;
+            }
+            
+            if ($request->has('lto_renewal_date')) {
+                $updateData['lto_renewal_date'] = $request->lto_renewal_date;
+            }
+            
+            if ($request->has('description')) {
+                $updateData['description'] = $request->description;
+            }
+            
+            if ($request->has('status')) {
+                $updateData['status'] = $request->status;
+            }
+            
+            // Always update images (either new ones or existing ones)
+            $updateData['images'] = json_encode($imageData);
+
+            $vehicle->update($updateData);
 
             return response()->json([
                 'success' => true,
@@ -182,12 +195,8 @@ class VehicleController extends Controller
                 'data' => $vehicle->fresh()
             ]);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update vehicle',
-                'error' => $e->getMessage()
-            ], 500);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to update vehicle', $e);
         }
     }
 
@@ -206,14 +215,7 @@ class VehicleController extends Controller
                 ], 404);
             }
 
-            // Delete associated images
-            if ($vehicle->images) {
-                foreach ($vehicle->images as $imagePath) {
-                    Storage::disk('public')->delete($imagePath);
-                }
-            }
-
-            // Delete the vehicle record
+            // No need to delete files from storage since images are stored in database
             $vehicle->delete();
 
             return response()->json([
@@ -221,12 +223,8 @@ class VehicleController extends Controller
                 'message' => 'Vehicle deleted successfully'
             ]);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete vehicle',
-                'error' => $e->getMessage()
-            ], 500);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to delete vehicle', $e);
         }
     }
 
@@ -243,7 +241,6 @@ class VehicleController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validation failed',
                     'errors' => $validator->errors()
                 ], 422);
             }
@@ -267,12 +264,8 @@ class VehicleController extends Controller
                 'data' => $vehicle->fresh()
             ]);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update vehicle status',
-                'error' => $e->getMessage()
-            ], 500);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to update vehicle status', $e);
         }
     }
 
@@ -298,12 +291,8 @@ class VehicleController extends Controller
                 'data' => $vehicles
             ]);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch vehicles by status',
-                'error' => $e->getMessage()
-            ], 500);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to fetch vehicles by status', $e);
         }
     }
 
@@ -330,12 +319,8 @@ class VehicleController extends Controller
                 'data' => $vehicles
             ]);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to search vehicles',
-                'error' => $e->getMessage()
-            ], 500);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to search vehicles', $e);
         }
     }
 }

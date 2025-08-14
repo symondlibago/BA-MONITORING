@@ -7,6 +7,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\PayrollController;
+use App\Http\Controllers\OfficePayrollController;
 use App\Http\Controllers\EmergencyCashAdvanceController;
 use App\Http\Controllers\EmergencyDeductionController;
 use App\Http\Controllers\TaskController;
@@ -33,6 +34,8 @@ Route::post("/login", [AuthController::class, "login"]);
 
 // Expense routes (public for now, can be protected later)
 Route::apiResource("expenses", ExpenseController::class);
+Route::get('/expenses/{id}/image/{imageIndex}', [ExpenseController::class, 'getImage']);
+
 
 // Vehicle routes (public for now, can be protected later)
 Route::apiResource("vehicles", VehicleController::class);
@@ -71,7 +74,7 @@ Route::middleware("api")->group(function () {
     // Employee routes
     Route::apiResource("employees", EmployeeController::class);
     
-    // Payroll routes
+    // Site Payroll routes (existing)
     Route::apiResource("payrolls", PayrollController::class);
     Route::get("employees/status/{status}", [PayrollController::class, "getEmployeesByStatus"]);
     Route::patch("payrolls/{id}/status", [PayrollController::class, "updateStatus"]);
@@ -81,6 +84,10 @@ Route::middleware("api")->group(function () {
     
     // New route for getting employee ECA/ED data
     Route::get("employees/{employeeId}/eca-ed", [PayrollController::class, "getEmployeeEcaEd"]);
+    
+    // Office Payroll routes (new)
+    Route::apiResource("office-payrolls", OfficePayrollController::class);
+    Route::patch("office-payrolls/{id}/status", [OfficePayrollController::class, "updateStatus"]);
     
     // Emergency Cash Advance routes
     Route::apiResource("emergency-cash-advances", EmergencyCashAdvanceController::class);

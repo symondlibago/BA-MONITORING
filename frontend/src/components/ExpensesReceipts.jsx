@@ -27,7 +27,7 @@ import API_BASE_URL from './Config' // Assuming API_BASE_URL is defined elsewher
 // const API_BASE_URL = 'http://localhost:8000/api' // Directly defining API_BASE_URL here
 
 // Image Gallery Modal Component
-function ImageGalleryModal({ isOpen, onClose, images, initialIndex = 0 }) {
+function ImageGalleryModal({ isOpen, onClose, images, initialIndex = 0, expenseId }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
 
   useEffect(() => {
@@ -94,7 +94,7 @@ function ImageGalleryModal({ isOpen, onClose, images, initialIndex = 0 }) {
 
           {/* Image */}
           <img
-            src={`${API_BASE_URL.replace('/api', '')}/storage/${images[currentIndex]}`}
+            src={`data:${images[currentIndex].mime_type};base64,${images[currentIndex].data}`}
             alt={`Image ${currentIndex + 1}`}
             className="max-w-full max-h-full object-contain"
           />
@@ -796,6 +796,7 @@ function ExpensesReceipts() {
   const [expandedRows, setExpandedRows] = useState(new Set())
   const [imageGalleryOpen, setImageGalleryOpen] = useState(false)
   const [galleryImages, setGalleryImages] = useState([])
+  const [galleryExpenseId, setGalleryExpenseId] = useState(null)
   const [galleryInitialIndex, setGalleryInitialIndex] = useState(0)
   const itemsPerPage = 10
 
@@ -928,11 +929,26 @@ function ExpensesReceipts() {
   }, [])
 
   // Handle image click
-  const handleImageClick = useCallback((images, initialIndex) => {
+  const handleImageClick = useCallback((expense, initialIndex) => {
+    // Parse images from database format
+    let images = []
+    if (expense.images) {
+      try {
+        const parsedImages = typeof expense.images === 'string' ? JSON.parse(expense.images) : expense.images
+        if (Array.isArray(parsedImages)) {
+          images = parsedImages
+        }
+      } catch (e) {
+        console.error('Error parsing images:', e)
+      }
+    }
+    
     setGalleryImages(images)
     setGalleryInitialIndex(initialIndex)
+    setGalleryExpenseId(expense.id)
     setImageGalleryOpen(true)
   }, [])
+
 
   // Load expenses on component mount
   useEffect(() => {
@@ -1013,11 +1029,32 @@ function ExpensesReceipts() {
   }
 
   // Get first image for display
-  const getFirstImage = (expense) => {
-    if (expense.images && expense.images.length > 0) {
-      return expense.images[0]
+  const getFirstImageUrl = (expense) => {
+    if (expense.images) {
+      try {
+        const parsedImages = typeof expense.images === 'string' ? JSON.parse(expense.images) : expense.images
+        if (Array.isArray(parsedImages) && parsedImages.length > 0) {
+          return `data:${parsedImages[0].mime_type};base64,${parsedImages[0].data}`
+        }
+      } catch (e) {
+        console.error('Error parsing images:', e)
+      }
     }
     return null
+  }
+
+const getImageCount = (expense) => {
+    if (expense.images) {
+      try {
+        const parsedImages = typeof expense.images === 'string' ? JSON.parse(expense.images) : expense.images
+        if (Array.isArray(parsedImages)) {
+          return parsedImages.length
+        }
+      } catch (e) {
+        console.error('Error parsing images:', e)
+      }
+    }
+    return 0
   }
 
   if (loading) {
@@ -1221,22 +1258,22 @@ function ExpensesReceipts() {
                             >
                               <ChevronRight className="h-4 w-4 text-[var(--color-foreground)]/50" />
                             </motion.div>
-                            {getFirstImage(expense) ? (
+                            {getFirstImageUrl(expense) ? (
                               <div className="relative">
                                 <img
-                                  src={`${API_BASE_URL.replace('/api', '')}/storage/${getFirstImage(expense)}`}
+                                  src={getFirstImageUrl(expense)}
                                   alt="Expense"
                                   className="w-10 h-10 object-cover rounded cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handleImageClick(expense.images, 0)
+                                    handleImageClick(expense, 0)
                                   }}
                                 />
-                                {expense.images && expense.images.length > 1 && (
+                                {getImageCount(expense) > 1 && (
                                   <div className="absolute -top-1 -right-1 bg-[var(--color-primary)] text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                                    {expense.images.length}
+                                    {getImageCount(expense)}
                                   </div>
-                                )}
+ )}
                               </div>
                             ) : (
                               <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center">
@@ -1360,6 +1397,7 @@ function ExpensesReceipts() {
         onClose={() => setImageGalleryOpen(false)}
         images={galleryImages}
         initialIndex={galleryInitialIndex}
+        expenseId={galleryExpenseId}
       />
     </div>
   )

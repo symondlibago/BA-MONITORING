@@ -5,12 +5,29 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Storage;
 use App\Models\DailyUpdate;
 use App\Models\Project;
 
 class DailyUpdateController extends Controller
 {
+    /**
+     * Handle image uploads and return structured data.
+     */
+    private function processImages($images): array
+    {
+        $data = [];
+        foreach ($images as $image) {
+            $content = file_get_contents($image->getRealPath());
+            $data[] = [
+                'data'          => base64_encode($content),
+                'mime_type'     => $image->getMimeType(),
+                'original_name' => $image->getClientOriginalName(),
+                'size'          => strlen($content)
+            ];
+        }
+        return $data;
+    }
+
     /**
      * Display a listing of daily updates for a specific project.
      *
@@ -49,7 +66,7 @@ class DailyUpdateController extends Controller
                 'weather' => 'nullable|string|max:255',
                 'manpower' => 'nullable|integer|min:0',
                 'activity' => 'required|string',
-                'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240', // 10MB max per image
+                'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif', // No size limit for database storage
             ]);
 
             if ($validator->fails()) {
@@ -60,13 +77,9 @@ class DailyUpdateController extends Controller
             }
 
             // Handle image uploads
-            $imagePaths = [];
-            if ($request->hasFile('images')) {
-                foreach ($request->file('images') as $image) {
-                    $path = $image->store('daily_updates', 'public');
-                    $imagePaths[] = $path;
-                }
-            }
+            $imageData = $request->hasFile('images') 
+                ? $this->processImages($request->file('images'))
+                : [];
 
             $dailyUpdate = DailyUpdate::create([
                 'project_id' => $request->project_id,
@@ -74,7 +87,7 @@ class DailyUpdateController extends Controller
                 'weather' => $request->weather,
                 'manpower' => $request->manpower,
                 'activity' => $request->activity,
-                'images' => $imagePaths,
+                'images' => json_encode($imageData),
             ]);
 
             return response()->json([
@@ -134,7 +147,7 @@ class DailyUpdateController extends Controller
                 'weather' => 'nullable|string|max:255',
                 'manpower' => 'nullable|integer|min:0',
                 'activity' => 'required|string',
-                'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240', // 10MB max per image
+                'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif', // No size limit for database storage
             ]);
 
             if ($validator->fails()) {
@@ -144,30 +157,21 @@ class DailyUpdateController extends Controller
                 ], 422);
             }
 
-            // Handle image uploads
-            $imagePaths = $dailyUpdate->images ?? [];
-            
-            // Only process new images if they are uploaded
+            // Handle images - only update if new images are uploaded
+            $imageData = null;
             if ($request->hasFile('images')) {
-                // Delete old images if new ones are uploaded
-                if (!empty($dailyUpdate->images)) {
-                    foreach ($dailyUpdate->images as $oldImage) {
-                        Storage::disk('public')->delete($oldImage);
-                    }
-                }
-                
-                $imagePaths = [];
-                foreach ($request->file('images') as $image) {
-                    $path = $image->store('daily_updates', 'public');
-                    $imagePaths[] = $path;
-                }
+                // New images uploaded, replace existing ones
+                $imageData = $this->processImages($request->file('images'));
+            } else {
+                // No new images, keep existing ones
+                $imageData = is_string($dailyUpdate->images) ? json_decode($dailyUpdate->images, true) : $dailyUpdate->images;
             }
 
             // Prepare update data
             $updateData = [
                 'date' => $request->date,
                 'activity' => $request->activity,
-                'images' => $imagePaths,
+                'images' => json_encode($imageData),
             ];
 
             // Only include optional fields if they are provided
@@ -204,13 +208,7 @@ class DailyUpdateController extends Controller
         try {
             $dailyUpdate = DailyUpdate::findOrFail($id);
             
-            // Delete associated images
-            if (!empty($dailyUpdate->images)) {
-                foreach ($dailyUpdate->images as $image) {
-                    Storage::disk('public')->delete($image);
-                }
-            }
-            
+            // No need to delete files from storage since images are stored in database
             $dailyUpdate->delete();
 
             return response()->json([

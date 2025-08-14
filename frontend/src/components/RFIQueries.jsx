@@ -30,6 +30,43 @@ import API_BASE_URL from './Config'
 // Status options for RFI queries
 const statusOptions = ['All', 'Pending', 'Approved', 'Reject']
 
+// Helper function to convert image data to data URL
+const getImageDataUrl = (imageData) => {
+  if (!imageData) return null
+  
+  // If it's already a data URL, return as is
+  if (typeof imageData === 'string' && imageData.startsWith('data:')) {
+    return imageData
+  }
+  
+  // If it's an object with data and mime_type, construct data URL
+  if (imageData.data && imageData.mime_type) {
+    return `data:${imageData.mime_type};base64,${imageData.data}`
+  }
+  
+  return null
+}
+
+// Helper function to get image data URLs from query images
+const getQueryImageUrls = (images) => {
+  if (!images) return []
+  
+  // Handle case where images is a JSON string
+  let imageArray = images
+  if (typeof images === 'string') {
+    try {
+      imageArray = JSON.parse(images)
+    } catch (e) {
+      console.error('Failed to parse images JSON:', e)
+      return []
+    }
+  }
+  
+  if (!Array.isArray(imageArray)) return []
+  
+  return imageArray.map(getImageDataUrl).filter(Boolean)
+}
+
 // Image Gallery Modal Component
 function ImageGalleryModal({ isOpen, onClose, images, initialIndex = 0 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
@@ -98,7 +135,7 @@ function ImageGalleryModal({ isOpen, onClose, images, initialIndex = 0 }) {
 
           {/* Image */}
           <img
-            src={`${API_BASE_URL.replace('/api', '')}/storage/${images[currentIndex]}`}
+            src={images[currentIndex]}
             alt={`Image ${currentIndex + 1}`}
             className="max-w-full max-h-full object-contain"
           />
@@ -112,6 +149,35 @@ function ImageGalleryModal({ isOpen, onClose, images, initialIndex = 0 }) {
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  )
+}
+
+// Expandable Text Component
+function ExpandableText({ text, maxLength = 100, className = "" }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  
+  if (!text || text.length <= maxLength) {
+    return <div className={`${className} break-words overflow-wrap-anywhere`}>{text}</div>
+  }
+  
+  const truncatedText = text.substring(0, maxLength)
+  
+  return (
+    <div className={`${className} break-words overflow-wrap-anywhere`}>
+      <div className="mb-1">
+        {isExpanded ? text : truncatedText}
+        {!isExpanded && '...'}
+      </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          setIsExpanded(!isExpanded)
+        }}
+        className="text-[var(--color-primary)] hover:text-[var(--color-primary)]/80 font-medium text-xs transition-colors underline"
+      >
+        {isExpanded ? 'show less' : 'show more'}
+      </button>
+    </div>
   )
 }
 
@@ -787,7 +853,8 @@ export default function RFIQueries() {
 
   // Open image gallery
   const openImageGallery = (images, index = 0) => {
-    setSelectedImages(images)
+    const imageUrls = getQueryImageUrls(images)
+    setSelectedImages(imageUrls)
     setSelectedImageIndex(index)
     setImageGalleryOpen(true)
   }
@@ -918,113 +985,111 @@ export default function RFIQueries() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
         >
           <AnimatePresence>
-            {filteredQueries.map((query, index) => (
-              <motion.div
-                key={query.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ delay: index * 0.05 }}
-                className="group"
-              >
-                <Card className="h-full border border-[var(--color-border)] hover:shadow-lg transition-all duration-300 hover:border-[var(--color-primary)]/30 bg-[var(--color-card)]">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg font-semibold text-[var(--color-foreground)] line-clamp-2">
-                          {query.description}
-                        </CardTitle>
-                        <div className="flex items-center gap-2 mt-2">
-                          <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-                            query.status === 'approved' 
-                              ? 'bg-green-100 text-green-800' 
-                              : query.status === 'reject'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {query.status === 'approved' ? (
-                              <CheckCircle className="h-3 w-3" />
-                            ) : query.status === 'reject' ? (
-                              <XCircle className="h-3 w-3" />
-                            ) : (
-                              <AlertTriangle className="h-3 w-3" />
+            {filteredQueries.map((query, index) => {
+              const imageUrls = getQueryImageUrls(query.images)
+              
+              return (
+                <motion.div
+                  key={query.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="group"
+                >
+                  <Card className="min-h-[450px] border border-[var(--color-border)] hover:shadow-lg transition-all duration-300 hover:border-[var(--color-primary)]/30 bg-[var(--color-card)] flex flex-col">
+                    <CardContent className="p-4 flex flex-col h-full">
+                      {/* Image Section */}
+                      <div className="mb-3">
+                        {imageUrls.length > 0 ? (
+                          <div className="relative">
+                            <img
+                              src={imageUrls[0]}
+                              alt="RFI Query"
+                              className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => openImageGallery(query.images, 0)}
+                              onError={(e) => {
+                                console.error('Image failed to load:', imageUrls[0])
+                                e.target.style.display = 'none'
+                              }}
+                            />
+                            {imageUrls.length > 1 && (
+                              <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
+                                +{imageUrls.length - 1}
+                              </div>
                             )}
-                            {query.status === 'approved' ? 'Approved' : query.status === 'reject' ? 'Reject' : 'Pending'}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openImageGallery(query.images, 0)}
+                              className="absolute inset-0 w-full h-full opacity-0 hover:opacity-100 bg-black/20 transition-opacity flex items-center justify-center"
+                            >
+                              <ZoomIn className="h-6 w-6 text-white" />
+                            </Button>
                           </div>
-                        </div>
+                        ) : (
+                          <div className="w-full h-32 bg-[var(--color-muted)] rounded-lg flex items-center justify-center">
+                            <FileText className="h-8 w-8 text-[var(--color-foreground)]/30" />
+                          </div>
+                        )}
                       </div>
-                      <div className="flex gap-1">
+
+                      {/* Date */}
+                      <div className="flex items-center gap-2 text-sm mb-3">
+                        <Calendar className="h-4 w-4 text-[var(--color-foreground)]/50" />
+                        <span className="text-[var(--color-foreground)]/70">
+                          {formatDate(query.date)}
+                        </span>
+                      </div>
+
+                      {/* Description */}
+                      <div className="flex-1 mb-3">
+                        <ExpandableText 
+                          text={query.description} 
+                          maxLength={80}
+                          className="text-sm text-[var(--color-foreground)]/80 leading-relaxed"
+                        />
+                      </div>
+
+                      {/* Status Dropdown */}
+                      <div className="mb-3 mt-auto">
+                        <StatusActionDropdown
+                          currentStatus={query.status}
+                          onStatusChange={handleStatusUpdate}
+                          queryId={query.id}
+                        />
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => {
                             setEditingQuery(query)
                             setIsModalOpen(true)
                           }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
+                          className="flex-1 border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)] text-xs"
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="h-3 w-3 mr-1" />
                         </Button>
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => openDeleteModal(query.id, query.description)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:bg-red-50"
+                          className="flex-1 border-red-200 text-red-600 hover:bg-red-500 text-xs"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3 mr-1" />
                         </Button>
                       </div>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-3">
-                    {/* RFI Query Images */}
-                    {query.images && query.images.length > 0 && (
-                      <div className="relative">
-                        <img
-                          src={`${API_BASE_URL.replace('/api', '')}/storage/${query.images[0]}`}
-                          alt="RFI Query"
-                          className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => openImageGallery(query.images, 0)}
-                        />
-                        {query.images.length > 1 && (
-                          <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
-                            +{query.images.length - 1}
-                          </div>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openImageGallery(query.images, 0)}
-                          className="absolute inset-0 w-full h-full opacity-0 hover:opacity-100 bg-black/20 transition-opacity flex items-center justify-center"
-                        >
-                          <ZoomIn className="h-6 w-6 text-white" />
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Date */}
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-[var(--color-foreground)]/50" />
-                      <span className="text-[var(--color-foreground)]/70">Date:</span>
-                      <span className="font-medium text-[var(--color-foreground)]">
-                        {formatDate(query.date)}
-                      </span>
-                    </div>
-
-                    {/* Status Action Dropdown */}
-                    <StatusActionDropdown
-                      currentStatus={query.status}
-                      onStatusChange={handleStatusUpdate}
-                      queryId={query.id}
-                    />
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )
+            })}
           </AnimatePresence>
         </motion.div>
       )}

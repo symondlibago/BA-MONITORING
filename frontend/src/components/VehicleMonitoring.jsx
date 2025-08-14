@@ -18,10 +18,10 @@ import {
   ZoomIn,
   ArrowLeft,
   ArrowRight,
-  Clock,
   CheckCircle,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  Images
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Button } from '@/components/ui/button.jsx'
@@ -30,6 +30,86 @@ import API_BASE_URL from './Config'
 
 // Status options for vehicles
 const statusOptions = ['All', 'Pending', 'Complete']
+
+// Success Alert Component
+function SuccessAlert({ isVisible, message, onClose }) {
+  useEffect(() => {
+    if (isVisible) {
+      const timer = setTimeout(() => {
+        onClose()
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [isVisible, onClose])
+
+  if (!isVisible) return null
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: -50, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -50, scale: 0.95 }}
+        transition={{ duration: 0.3 }}
+        className="fixed top-4 right-4 z-50 bg-green-50 border border-green-200 rounded-lg shadow-lg p-4 max-w-sm"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-green-800">{message}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="flex-shrink-0 h-6 w-6 p-0 text-green-600 hover:bg-green-100"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+// Helper function to convert image data to data URL
+const getImageDataUrl = (imageData) => {
+  if (!imageData) return null
+  
+  // If it's already a data URL, return as is
+  if (typeof imageData === 'string' && imageData.startsWith('data:')) {
+    return imageData
+  }
+  
+  // If it's an object with data and mime_type, construct data URL
+  if (imageData.data && imageData.mime_type) {
+    return `data:${imageData.mime_type};base64,${imageData.data}`
+  }
+  
+  return null
+}
+
+// Helper function to get image data URLs from vehicle images
+const getVehicleImageUrls = (images) => {
+  if (!images) return []
+  
+  // Handle case where images is a JSON string
+  let imageArray = images
+  if (typeof images === 'string') {
+    try {
+      imageArray = JSON.parse(images)
+    } catch (e) {
+      console.error('Failed to parse images JSON:', e)
+      return []
+    }
+  }
+  
+  if (!Array.isArray(imageArray)) return []
+  
+  return imageArray.map(getImageDataUrl).filter(Boolean)
+}
 
 // Image Gallery Modal Component
 function ImageGalleryModal({ isOpen, onClose, images, initialIndex = 0 }) {
@@ -97,9 +177,9 @@ function ImageGalleryModal({ isOpen, onClose, images, initialIndex = 0 }) {
             </>
           )}
 
-          {/* Image */}
+          {/* Image - Now using base64 data URLs directly */}
           <img
-            src={`${API_BASE_URL.replace('/api', '')}/storage/${images[currentIndex]}`}
+            src={images[currentIndex]}
             alt={`Image ${currentIndex + 1}`}
             className="max-w-full max-h-full object-contain"
           />
@@ -268,7 +348,7 @@ function DeleteConfirmationModal({ isOpen, onClose, onConfirm, itemName }) {
 
 // Vehicle Modal Component (for Add and Edit)
 function VehicleModal({ isOpen, onClose, onSubmit, initialData }) {
-  const [formData, setFormData] = useState(initialData || {
+  const [formData, setFormData] = useState({
     vehicle_name: '',
     lto_renewal_date: '',
     description: '',
@@ -277,10 +357,13 @@ function VehicleModal({ isOpen, onClose, onSubmit, initialData }) {
   })
 
   const [selectedImages, setSelectedImages] = useState([])
+  const [existingImages, setExistingImages] = useState([])
+  const [keepExistingImages, setKeepExistingImages] = useState(true)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
     if (initialData) {
+      // Pre-fill form with existing data
       setFormData({
         vehicle_name: initialData.vehicle_name || '',
         lto_renewal_date: initialData.lto_renewal_date || '',
@@ -288,7 +371,13 @@ function VehicleModal({ isOpen, onClose, onSubmit, initialData }) {
         status: initialData.status || 'pending',
         images: initialData.images || []
       })
+      
+      // Set existing images for display
+      const imageUrls = getVehicleImageUrls(initialData.images)
+      setExistingImages(imageUrls)
+      setKeepExistingImages(true)
     } else {
+      // Reset form for new vehicle
       setFormData({
         vehicle_name: '',
         lto_renewal_date: '',
@@ -296,9 +385,11 @@ function VehicleModal({ isOpen, onClose, onSubmit, initialData }) {
         status: 'pending',
         images: []
       })
+      setExistingImages([])
+      setKeepExistingImages(true)
     }
     setSelectedImages([])
-  }, [initialData])
+  }, [initialData, isOpen])
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -311,10 +402,17 @@ function VehicleModal({ isOpen, onClose, onSubmit, initialData }) {
       return
     }
     setSelectedImages(prev => [...prev, ...files])
+    // When new images are selected, we'll replace existing ones
+    setKeepExistingImages(false)
   }
 
-  const removeImage = (index) => {
+  const removeNewImage = (index) => {
     setSelectedImages(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const clearNewImages = () => {
+    setSelectedImages([])
+    setKeepExistingImages(true)
   }
 
   const handleSubmit = (e) => {
@@ -334,10 +432,13 @@ function VehicleModal({ isOpen, onClose, onSubmit, initialData }) {
     submitData.append('description', formData.description)
     submitData.append('status', formData.status)
     
-    // Add images
-    selectedImages.forEach((image, index) => {
-      submitData.append(`images[${index}]`, image)
-    })
+    // Add images only if new ones are selected
+    if (selectedImages.length > 0) {
+      selectedImages.forEach((image, index) => {
+        submitData.append(`images[${index}]`, image)
+      })
+    }
+    // If no new images and it's an update, the backend will keep existing images
     
     if (initialData) {
       submitData.append('_method', 'PUT')
@@ -388,53 +489,106 @@ function VehicleModal({ isOpen, onClose, onSubmit, initialData }) {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Images Upload Section */}
+              {/* Images Section */}
               <div>
                 <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
                   Images (Max 10)
                 </label>
-                <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-4">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Images
-                  </Button>
-                  
-                  {selectedImages.length > 0 && (
-                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {selectedImages.map((image, index) => (
+                
+                {/* Existing Images Display (for edit mode) */}
+                {initialData && existingImages.length > 0 && keepExistingImages && (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-[var(--color-foreground)]/70">
+                        Current Images ({existingImages.length})
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setKeepExistingImages(false)}
+                        className="text-xs"
+                      >
+                        Replace Images
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-3 bg-[var(--color-muted)]/30 rounded-lg">
+                      {existingImages.map((imageUrl, index) => (
                         <div key={index} className="relative">
                           <img
-                            src={URL.createObjectURL(image)}
-                            alt={`Preview ${index + 1}`}
+                            src={imageUrl}
+                            alt={`Existing ${index + 1}`}
                             className="w-full h-20 object-cover rounded"
                           />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeImage(index)}
-                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white hover:bg-red-600"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {/* New Images Upload */}
+                {(!initialData || !keepExistingImages) && (
+                  <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-4">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {initialData ? 'Upload New Images' : 'Upload Images'}
+                    </Button>
+                    
+                    {selectedImages.length > 0 && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-[var(--color-foreground)]/70">
+                            New Images ({selectedImages.length})
+                          </span>
+                          {initialData && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={clearNewImages}
+                              className="text-xs"
+                            >
+                              Keep Existing
+                            </Button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          {selectedImages.map((image, index) => (
+                            <div key={index} className="relative">
+                              <img
+                                src={URL.createObjectURL(image)}
+                                alt={`Preview ${index + 1}`}
+                                className="w-full h-20 object-cover rounded"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeNewImage(index)}
+                                className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white hover:bg-red-600"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -448,7 +602,7 @@ function VehicleModal({ isOpen, onClose, onSubmit, initialData }) {
                     value={formData.vehicle_name}
                     onChange={(e) => handleInputChange('vehicle_name', e.target.value)}
                     className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                    placeholder="e.g., Toyota Hilux, Honda Civic"
+                    placeholder="e.g., Toyota Camry 2020"
                     required
                   />
                 </div>
@@ -495,7 +649,6 @@ function VehicleModal({ isOpen, onClose, onSubmit, initialData }) {
                 />
               </div>
 
-              {/* Submit Buttons */}
               <div className="flex justify-end space-x-3 pt-4">
                 <Button
                   type="button"
@@ -507,7 +660,7 @@ function VehicleModal({ isOpen, onClose, onSubmit, initialData }) {
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] text-white hover:opacity-90 transition-opacity"
+                  className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary)]/90 transition-colors"
                 >
                   {initialData ? 'Update Vehicle' : 'Add Vehicle'}
                 </Button>
@@ -520,67 +673,33 @@ function VehicleModal({ isOpen, onClose, onSubmit, initialData }) {
   )
 }
 
-// Success Alert Component
-function SuccessAlert({ message, isVisible, onClose }) {
-  useEffect(() => {
-    if (isVisible) {
-      const timer = setTimeout(() => {
-        onClose()
-      }, 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [isVisible, onClose])
-
-  if (!isVisible) return null
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, y: -50, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -50, scale: 0.95 }}
-        className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2"
-      >
-        <CheckCircle className="h-5 w-5" />
-        <span>{message}</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="text-white hover:bg-white/20 ml-2"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </motion.div>
-    </AnimatePresence>
-  )
-}
-
-// Main VehicleMonitoring Component
+// Main Vehicle Monitoring Component
 export default function VehicleMonitoring() {
   const [vehicles, setVehicles] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedStatus, setSelectedStatus] = useState('All')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(12)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingVehicle, setEditingVehicle] = useState(null)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [vehicleToDelete, setVehicleToDelete] = useState(null)
   const [imageGalleryOpen, setImageGalleryOpen] = useState(false)
-  const [selectedImages, setSelectedImages] = useState([])
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const [galleryImages, setGalleryImages] = useState([])
+  const [galleryInitialIndex, setGalleryInitialIndex] = useState(0)
   const [successAlert, setSuccessAlert] = useState({ visible: false, message: '' })
-  const [deleteModal, setDeleteModal] = useState({ isOpen: false, vehicleId: null, vehicleName: '' })
 
   // Fetch vehicles from API
   const fetchVehicles = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`${API_BASE_URL}/vehicles`)
-      const data = await response.json()
-      
-      if (data.success) {
+      if (response.ok) {
+        const data = await response.json()
         setVehicles(data.data || [])
       } else {
-        console.error('Failed to fetch vehicles:', data.message)
+        console.error('Failed to fetch vehicles')
       }
     } catch (error) {
       console.error('Error fetching vehicles:', error)
@@ -593,15 +712,31 @@ export default function VehicleMonitoring() {
     fetchVehicles()
   }, [fetchVehicles])
 
+  // Show success alert
+  const showSuccessAlert = (message) => {
+    setSuccessAlert({ visible: true, message })
+  }
+
+  // Hide success alert
+  const hideSuccessAlert = () => {
+    setSuccessAlert({ visible: false, message: '' })
+  }
+
   // Filter and search vehicles
   const filteredVehicles = useMemo(() => {
     return vehicles.filter(vehicle => {
       const matchesSearch = vehicle.vehicle_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            vehicle.description?.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesStatus = selectedStatus === 'All' || vehicle.status === selectedStatus.toLowerCase()
+      const matchesStatus = statusFilter === 'All' || vehicle.status === statusFilter.toLowerCase()
       return matchesSearch && matchesStatus
     })
-  }, [vehicles, searchTerm, selectedStatus])
+  }, [vehicles, searchTerm, statusFilter])
+
+  // Pagination
+  const totalPages = Math.ceil(filteredVehicles.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentVehicles = filteredVehicles.slice(startIndex, endIndex)
 
   // Handle vehicle submission (add/edit)
   const handleVehicleSubmit = async (formData, vehicleId = null) => {
@@ -610,79 +745,58 @@ export default function VehicleMonitoring() {
         ? `${API_BASE_URL}/vehicles/${vehicleId}` 
         : `${API_BASE_URL}/vehicles`
       
-      const method = 'POST'
+      const method = vehicleId ? 'POST' : 'POST' // Laravel handles PUT via _method field
       
       const response = await fetch(url, {
         method,
         body: formData
       })
-      
-      const data = await response.json()
-      
-      if (data.success) {
+
+      if (response.ok) {
         await fetchVehicles()
-        setSuccessAlert({
-          visible: true,
-          message: vehicleId ? 'Vehicle updated successfully!' : 'Vehicle added successfully!'
-        })
+        showSuccessAlert(vehicleId ? 'Vehicle updated successfully!' : 'Vehicle added successfully!')
+        setEditingVehicle(null)
       } else {
-        alert(data.message || 'Failed to save vehicle')
+        console.error('Failed to save vehicle')
+        alert('Failed to save vehicle. Please try again.')
       }
     } catch (error) {
       console.error('Error saving vehicle:', error)
-      alert('Failed to save vehicle')
+      alert('Error saving vehicle. Please try again.')
     }
   }
 
   // Handle vehicle deletion
-  const handleDeleteVehicle = async (vehicleId) => {
+  const handleDeleteVehicle = async () => {
+    if (!vehicleToDelete) return
+
     try {
-      const response = await fetch(`${API_BASE_URL}/vehicles/${vehicleId}`, {
+      const response = await fetch(`${API_BASE_URL}/vehicles/${vehicleToDelete.id}`, {
         method: 'DELETE'
       })
-      
-      const data = await response.json()
-      
-      if (data.success) {
+
+      if (response.ok) {
         await fetchVehicles()
-        setSuccessAlert({
-          visible: true,
-          message: 'Vehicle deleted successfully!'
-        })
+        showSuccessAlert('Vehicle deleted successfully!')
+        setDeleteModalOpen(false)
+        setVehicleToDelete(null)
       } else {
-        alert(data.message || 'Failed to delete vehicle')
+        console.error('Failed to delete vehicle')
+        alert('Failed to delete vehicle. Please try again.')
       }
     } catch (error) {
       console.error('Error deleting vehicle:', error)
-      alert('Failed to delete vehicle')
+      alert('Error deleting vehicle. Please try again.')
     }
   }
 
-  // Handle status update
-  const handleStatusUpdate = async (vehicleId, newStatus) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/vehicles/${vehicleId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        await fetchVehicles()
-        setSuccessAlert({
-          visible: true,
-          message: 'Vehicle status updated successfully!'
-        })
-      } else {
-        alert(data.message || 'Failed to update status')
-      }
-    } catch (error) {
-      console.error('Error updating status:', error)
-      alert('Failed to update status')
+  // Handle image gallery
+  const openImageGallery = (images, initialIndex = 0) => {
+    const imageUrls = getVehicleImageUrls(images)
+    if (imageUrls.length > 0) {
+      setGalleryImages(imageUrls)
+      setGalleryInitialIndex(initialIndex)
+      setImageGalleryOpen(true)
     }
   }
 
@@ -693,8 +807,7 @@ export default function VehicleMonitoring() {
       'LTO Renewal Date': vehicle.lto_renewal_date,
       'Description': vehicle.description,
       'Status': vehicle.status,
-      'Created At': new Date(vehicle.created_at).toLocaleDateString(),
-      'Updated At': new Date(vehicle.updated_at).toLocaleDateString()
+      'Created Date': new Date(vehicle.created_at).toLocaleDateString()
     }))
 
     const ws = XLSX.utils.json_to_sheet(exportData)
@@ -703,317 +816,274 @@ export default function VehicleMonitoring() {
     XLSX.writeFile(wb, `vehicles_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
-  // Open image gallery
-  const openImageGallery = (images, index = 0) => {
-    setSelectedImages(images)
-    setSelectedImageIndex(index)
-    setImageGalleryOpen(true)
-  }
-
-  // Format date for display
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
-
-  // Check if LTO renewal is due soon (within 30 days)
-  const isRenewalDueSoon = (renewalDate) => {
-    if (!renewalDate) return false
-    const today = new Date()
-    const renewal = new Date(renewalDate)
-    const diffTime = renewal - today
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays <= 30 && diffDays >= 0
-  }
-
-  // Check if LTO renewal is overdue
-  const isRenewalOverdue = (renewalDate) => {
-    if (!renewalDate) return false
-    const today = new Date()
-    const renewal = new Date(renewalDate)
-    return renewal < today
-  }
-
-  // Open delete confirmation modal
-  const openDeleteModal = (vehicleId, vehicleName) => {
-    setDeleteModal({
-      isOpen: true,
-      vehicleId,
-      vehicleName: vehicleName.length > 50 ? vehicleName.substring(0, 50) + '...' : vehicleName
-    })
-  }
-
-  // Close delete confirmation modal
-  const closeDeleteModal = () => {
-    setDeleteModal({ isOpen: false, vehicleId: null, vehicleName: '' })
-  }
-
-  // Confirm deletion
-  const confirmDelete = () => {
-    if (deleteModal.vehicleId) {
-      handleDeleteVehicle(deleteModal.vehicleId)
-      closeDeleteModal()
-    }
-  }
+  // Prepare dropdown options
+  const statusDropdownOptions = statusOptions.map(status => ({
+    value: status,
+    label: status
+  }))
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-[var(--color-background)] p-4 md:p-6">
       {/* Success Alert */}
       <SuccessAlert
-        message={successAlert.message}
         isVisible={successAlert.visible}
-        onClose={() => setSuccessAlert({ visible: false, message: '' })}
+        message={successAlert.message}
+        onClose={hideSuccessAlert}
       />
 
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-      >
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] bg-clip-text text-transparent">
-            Vehicle Monitoring
-          </h1>
-          <p className="text-[var(--color-foreground)]/70 mt-1">
-            Manage vehicle information and LTO renewal dates
-          </p>
-        </div>
-        
-        <div className="flex gap-2">
-          <Button
-            onClick={exportToExcel}
-            variant="outline"
-            className="border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button
-            onClick={() => {
-              setEditingVehicle(null)
-              setIsModalOpen(true)
-            }}
-            className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] text-white hover:opacity-90 transition-opacity"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Vehicle
-          </Button>
-        </div>
-      </motion.div>
+      <div className="mb-8">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+        >
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] bg-clip-text text-transparent">
+              Vehicle Monitoring
+            </h1>
+            <p className="text-[var(--color-foreground)]/70 mt-2">
+              Track and manage vehicle registrations and renewals
+            </p>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={exportToExcel}
+              variant="outline"
+              className="border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)] transition-colors"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export Excel
+            </Button>
+            <Button
+              onClick={() => {
+                setEditingVehicle(null)
+                setIsModalOpen(true)
+              }}
+              className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary)]/90 transition-colors"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Vehicle
+            </Button>
+          </div>
+        </motion.div>
+      </div>
 
-      {/* Search and Filter Controls */}
+      {/* Filters */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="flex flex-col sm:flex-row gap-4"
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="mb-6"
       >
-        {/* Search Bar */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-foreground)]/50 h-4 w-4" />
-          <input
-            type="text"
-            placeholder="Search vehicles..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-          />
-        </div>
+        <Card className="border-[var(--color-border)] bg-[var(--color-card)]">
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              {/* Search */}
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--color-foreground)]/50" />
+                  <input
+                    type="text"
+                    placeholder="Search vehicles..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                  />
+                </div>
+              </div>
 
-        {/* Status Filter */}
-        <div className="flex gap-2">
-          {statusOptions.map((status) => (
-            <Button
-              key={status}
-              variant={selectedStatus === status ? "default" : "outline"}
-              onClick={() => setSelectedStatus(status)}
-              className={
-                selectedStatus === status
-                  ? "bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] text-white"
-                  : "border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
-              }
-            >
-              {status}
-            </Button>
-          ))}
-        </div>
+              {/* Status Filter */}
+              <div className="w-full md:w-48">
+                <CustomDropdown
+                  options={statusDropdownOptions}
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  placeholder="Filter by status"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </motion.div>
 
-      {/* Vehicles Grid */}
-      {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
-        </div>
-      ) : (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6"
-        >
-          <AnimatePresence>
-            {filteredVehicles.map((vehicle, index) => (
-              <motion.div
-                key={vehicle.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ delay: index * 0.05 }}
-                className="group"
-              >
-                <Card className="h-full border border-[var(--color-border)] hover:shadow-lg transition-all duration-300 hover:border-[var(--color-primary)]/30 bg-[var(--color-card)]">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg font-semibold text-[var(--color-foreground)] line-clamp-1">
-                          {vehicle.vehicle_name}
-                        </CardTitle>
-                        <div className="flex items-center gap-2 mt-2">
-                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            vehicle.status === 'complete' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {vehicle.status === 'complete' ? 'Complete' : 'Pending'}
+      {/* Vehicle Grid */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+      >
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
+          </div>
+        ) : currentVehicles.length === 0 ? (
+          <Card className="border-[var(--color-border)] bg-[var(--color-card)]">
+            <CardContent className="p-12 text-center">
+              <Car className="h-12 w-12 text-[var(--color-foreground)]/30 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-[var(--color-foreground)] mb-2">
+                No vehicles found
+              </h3>
+              <p className="text-[var(--color-foreground)]/70 mb-4">
+                {searchTerm || statusFilter !== 'All' 
+                  ? 'Try adjusting your search or filter criteria.'
+                  : 'Get started by adding your first vehicle.'}
+              </p>
+              {!searchTerm && statusFilter === 'All' && (
+                <Button
+                  onClick={() => {
+                    setEditingVehicle(null)
+                    setIsModalOpen(true)
+                  }}
+                  className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary)]/90 transition-colors"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Vehicle
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {currentVehicles.map((vehicle, index) => {
+              const imageUrls = getVehicleImageUrls(vehicle.images)
+              const hasImages = imageUrls.length > 0
+              
+              return (
+                <motion.div
+                  key={vehicle.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                >
+                  <Card className="border-[var(--color-border)] bg-[var(--color-card)] hover:shadow-lg transition-all duration-200 h-full">
+                    <CardContent className="p-4">
+                      {/* Image Section */}
+                      <div className="relative mb-4">
+                        {hasImages ? (
+                          <div className="relative">
+                            <img
+                              src={imageUrls[0]}
+                              alt={vehicle.vehicle_name}
+                              className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => openImageGallery(vehicle.images, 0)}
+                            />
+                            {imageUrls.length > 1 && (
+                              <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1">
+                                <Images className="h-3 w-3" />
+                                +{imageUrls.length - 1} more
+                              </div>
+                            )}
                           </div>
-                          {isRenewalOverdue(vehicle.lto_renewal_date) && (
-                            <AlertCircle className="h-4 w-4 text-red-500" title="LTO Renewal Overdue" />
-                          )}
-                          {isRenewalDueSoon(vehicle.lto_renewal_date) && !isRenewalOverdue(vehicle.lto_renewal_date) && (
-                            <Clock className="h-4 w-4 text-orange-500" title="LTO Renewal Due Soon" />
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingVehicle(vehicle)
-                            setIsModalOpen(true)
-                          }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openDeleteModal(vehicle.id, vehicle.vehicle_name)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-3">
-                    {/* Vehicle Images */}
-                    {vehicle.images && vehicle.images.length > 0 && (
-                      <div className="relative">
-                        <img
-                          src={`${API_BASE_URL.replace('/api', '')}/storage/${vehicle.images[0]}`}
-                          alt={vehicle.vehicle_name}
-                          className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => openImageGallery(vehicle.images, 0)}
-                        />
-                        {vehicle.images.length > 1 && (
-                          <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
-                            +{vehicle.images.length - 1}
+                        ) : (
+                          <div className="w-full h-48 bg-[var(--color-muted)] rounded-lg flex items-center justify-center">
+                            <Car className="h-12 w-12 text-[var(--color-foreground)]/30" />
                           </div>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openImageGallery(vehicle.images, 0)}
-                          className="absolute inset-0 w-full h-full opacity-0 hover:opacity-100 bg-black/20 transition-opacity flex items-center justify-center"
-                        >
-                          <ZoomIn className="h-6 w-6 text-white" />
-                        </Button>
                       </div>
-                    )}
 
-                    {/* LTO Renewal Date */}
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-[var(--color-foreground)]/50" />
-                      <span className="text-[var(--color-foreground)]/70">LTO Renewal:</span>
-                      <span className={`font-medium ${
-                        isRenewalOverdue(vehicle.lto_renewal_date) 
-                          ? 'text-red-600' 
-                          : isRenewalDueSoon(vehicle.lto_renewal_date) 
-                            ? 'text-orange-600' 
-                            : 'text-[var(--color-foreground)]'
-                      }`}>
-                        {formatDate(vehicle.lto_renewal_date)}
-                      </span>
-                    </div>
+                      {/* Vehicle Info */}
+                      <div className="space-y-3">
+                        <div>
+                          <h3 className="font-semibold text-[var(--color-foreground)] text-lg line-clamp-1">
+                            {vehicle.vehicle_name}
+                          </h3>
+                          {vehicle.description && (
+                            <p className="text-sm text-[var(--color-foreground)]/70 line-clamp-2 mt-1">
+                              {vehicle.description}
+                            </p>
+                          )}
+                        </div>
 
-                    {/* Description */}
-                    {vehicle.description && (
-                      <div className="flex items-start gap-2 text-sm">
-                        <FileText className="h-4 w-4 text-[var(--color-foreground)]/50 mt-0.5 flex-shrink-0" />
-                        <p className="text-[var(--color-foreground)]/70 line-clamp-2">
-                          {vehicle.description}
-                        </p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calendar className="h-4 w-4 text-[var(--color-foreground)]/50" />
+                          <span className="text-[var(--color-foreground)]/70">
+                            {new Date(vehicle.lto_renewal_date).toLocaleDateString()}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${
+                              vehicle.status === 'complete' ? 'bg-green-500' : 'bg-yellow-500'
+                            }`} />
+                            <span className="text-sm text-[var(--color-foreground)]/70 capitalize">
+                              {vehicle.status}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingVehicle(vehicle)
+                                setIsModalOpen(true)
+                              }}
+                              className="h-8 w-8 p-0 text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setVehicleToDelete(vehicle)
+                                setDeleteModalOpen(true)
+                              }}
+                              className="h-8 w-8 p-0 text-red-600 hover:bg-red-500"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )
+            })}
+          </div>
+        )}
+      </motion.div>
 
-                    {/* Status Update Button */}
-                    <Button
-                      onClick={() => handleStatusUpdate(
-                        vehicle.id, 
-                        vehicle.status === 'pending' ? 'complete' : 'pending'
-                      )}
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
-                    >
-                      Mark as {vehicle.status === 'pending' ? 'Complete' : 'Pending'}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
-      )}
-
-      {/* Empty State */}
-      {!loading && filteredVehicles.length === 0 && (
+      {/* Pagination */}
+      {totalPages > 1 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center py-12"
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="mt-8 flex items-center justify-center gap-2"
         >
-          <Car className="h-16 w-16 text-[var(--color-foreground)]/30 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-[var(--color-foreground)] mb-2">
-            No vehicles found
-          </h3>
-          <p className="text-[var(--color-foreground)]/70 mb-4">
-            {searchTerm || selectedStatus !== 'All' 
-              ? 'Try adjusting your search or filter criteria.' 
-              : 'Get started by adding your first vehicle.'}
-          </p>
           <Button
-            onClick={() => {
-              setEditingVehicle(null)
-              setIsModalOpen(true)
-            }}
-            className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] text-white hover:opacity-90 transition-opacity"
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className="border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Vehicle
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          
+          <span className="text-sm text-[var(--color-foreground)]/70 px-4">
+            Page {currentPage} of {totalPages}
+          </span>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            className="border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
+          >
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </motion.div>
       )}
 
-      {/* Vehicle Modal */}
+      {/* Modals */}
       <VehicleModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -1024,20 +1094,21 @@ export default function VehicleMonitoring() {
         initialData={editingVehicle}
       />
 
-      {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
-        isOpen={deleteModal.isOpen}
-        onClose={closeDeleteModal}
-        onConfirm={confirmDelete}
-        itemName={deleteModal.vehicleName}
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false)
+          setVehicleToDelete(null)
+        }}
+        onConfirm={handleDeleteVehicle}
+        itemName={vehicleToDelete?.vehicle_name}
       />
 
-      {/* Image Gallery Modal */}
       <ImageGalleryModal
         isOpen={imageGalleryOpen}
         onClose={() => setImageGalleryOpen(false)}
-        images={selectedImages}
-        initialIndex={selectedImageIndex}
+        images={galleryImages}
+        initialIndex={galleryInitialIndex}
       />
     </div>
   )
