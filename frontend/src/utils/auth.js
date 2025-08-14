@@ -1,5 +1,5 @@
 // Authentication utility functions
-const API_BASE_URL = 'http://localhost:8000/api'
+import API_BASE_URL from "@/components/Config"
 
 // Get auth token from localStorage
 export const getAuthToken = () => {
@@ -17,7 +17,7 @@ export const isAuthenticated = () => {
   return !!getAuthToken()
 }
 
-// Logout function
+// Logout function with redirect to login page
 export const logout = async () => {
   const token = getAuthToken()
   
@@ -39,6 +39,10 @@ export const logout = async () => {
   // Clear local storage
   localStorage.removeItem('auth_token')
   localStorage.removeItem('user')
+  
+  // Redirect to login page by reloading the app
+  // This will trigger the authentication check and show login page
+  window.location.href = '/'
 }
 
 // API request with authentication
@@ -68,7 +72,7 @@ export const authenticatedRequest = async (url, options = {}) => {
     // If unauthorized, logout user
     if (response.status === 401) {
       logout()
-      window.location.reload()
+      return
     }
     
     return response

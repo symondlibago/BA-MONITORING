@@ -14,10 +14,29 @@ class AdminUserSeeder extends Seeder
      */
     public function run(): void
     {
+        // Create admin1@benoya.com
         User::create([
-            'name' => 'Admin User',
-            'email' => 'admin@example.com',
-            'password' => Hash::make('adminpassword'),
+            'name' => 'Admin One',
+            'email' => 'admin1@benoya.com',
+            'password' => Hash::make('adminpasswordbenoya1'),
+            'role' => 'admin',
+        ]);
+
+        // Create admin2@benoya.com
+        User::create([
+            'name' => 'Admin Two',
+            'email' => 'admin2@benoya.com',
+            'password' => Hash::make('adminpasswordbenoya2'),
+            'role' => 'admin',
+        ]);
+
+        // Create admin3@benoya.com
+        User::create([
+            'name' => 'Admin Three',
+            'email' => 'admin3@benoya.com',
+            'password' => Hash::make('adminpasswordbenoya2'),
+            'role' => 'admin',
         ]);
     }
 }
+

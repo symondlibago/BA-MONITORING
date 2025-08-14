@@ -1453,7 +1453,7 @@ const WorkersPayroll = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen  p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <motion.div
@@ -1472,7 +1472,7 @@ const WorkersPayroll = () => {
             {/* View Toggle Buttons */}
             <div className="flex items-center relative bg-white border border-gray-200 rounded-lg p-1 overflow-hidden">
               <motion.div
-                className="absolute top-1 left-1 bottom-1 rounded-md bg-blue-600"
+                className="absolute top-1 left-1 bottom-1 rounded-md bg-gray-800"
                 initial={false}
                 animate={{
                   x: viewMode === 'card' ? 0 : 40,
@@ -1490,7 +1490,7 @@ const WorkersPayroll = () => {
                 className={`relative z-10 px-3 py-2 rounded-md transition-all duration-300 ${
                   viewMode === 'card'
                     ? 'text-white'
-                    : 'text-gray-600 hover:text-blue-600'
+                    : 'text-gray-800 hover:text-gray-800'
                 }`}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -1516,7 +1516,7 @@ const WorkersPayroll = () => {
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
                 onClick={() => setShowProcessModal(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300"
+                className="bg-gray-800 hover:bg-gray-700 text-white transition-all duration-300"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Process Payroll
@@ -1528,10 +1528,10 @@ const WorkersPayroll = () => {
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[
-            { title: 'Total Records', amount: summaryStats.totalRecords, color: 'bg-blue-600', icon: Users, isDays: false, isCount: true },
-            { title: 'Total Gross Pay', amount: summaryStats.totalGrossPay, color: 'bg-blue-600', icon: DollarSign },
-            { title: 'Total Deductions', amount: summaryStats.totalDeductions, color: 'bg-blue-600', icon: Calculator },
-            { title: 'Total Net Pay', amount: summaryStats.totalNetPay, color: 'bg-blue-600', icon: CreditCard }
+            { title: 'Total Records', amount: summaryStats.totalRecords, color: 'bg-gray-800', icon: Users, isDays: false, isCount: true },
+            { title: 'Total Gross Pay', amount: summaryStats.totalGrossPay, color: 'bg-gray-800', icon: DollarSign },
+            { title: 'Total Deductions', amount: summaryStats.totalDeductions, color: 'bg-gray-800', icon: Calculator },
+            { title: 'Total Net Pay', amount: summaryStats.totalNetPay, color: 'bg-gray-800', icon: CreditCard }
           ].map((stat, index) => {
             const Icon = stat.icon
             return (
@@ -1715,7 +1715,6 @@ const WorkersPayroll = () => {
                         }}
                       >
                         <Edit className="h-4 w-4 mr-1" />
-                        Edit
                       </Button>
                       <Button
                         variant="outline"
@@ -1724,10 +1723,9 @@ const WorkersPayroll = () => {
                           setSelectedRecord(record)
                           setShowDeleteModal(true)
                         }}
-                        className="text-red-600 hover:text-red-700 hover:border-red-300"
+                        className="text-red-600 hover:text-white hover:bg-red-600 "
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
                       </Button>
                     </div>
                   </CardContent>

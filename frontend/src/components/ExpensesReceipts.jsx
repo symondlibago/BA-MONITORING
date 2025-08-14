@@ -1331,7 +1331,7 @@ const getImageCount = (expense) => {
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="border-b border-[var(--color-border)] bg-[var(--color-muted)]/30"
+                            className="border-b border-[var(--color-border)] bg-gray-100"
                           >
                             <td colSpan="10" className="px-4 py-3">
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">

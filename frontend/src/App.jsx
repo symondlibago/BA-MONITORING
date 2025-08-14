@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Receipt,
@@ -30,23 +30,29 @@ import Employee from './components/Employee'
 import SiteOperation from './components/SiteOperation'
 import VehicleMonitoring from './components/VehicleMonitoring'
 import RFIQueries from './components/RFIQueries'
-import ProtectedRoute from './components/ProtectedRoute'
+import LoginPage from './components/LoginPage'
 import { logout, isAuthenticated, getUser } from './utils/auth'
 
+// Navigation items with role-based access
 const navigationItems = [
-  { path: '/', icon: Home, label: 'Dashboard', color: 'text-white' },
-  { path: '/expenses', icon: Receipt, label: 'Expenses & Receipts', color: 'text-white' },
-  { path: '/inventory', icon: Wrench, label: 'Equipment Inventory', color: 'text-white' },
-  { path: '/tasks', icon: ClipboardList, label: 'Task Monitoring', color: 'text-white' },
-  { path: '/payroll', icon: DollarSign, label: 'Workers Payroll', color: 'text-white' },
-  { path: '/employees', icon: Users, label: 'Employee Management', color: 'text-white' },
-  { path: '/vehicles', icon: Car, label: 'Vehicle Monitoring', color: 'text-white' },
-  { path: '/rfi-queries', icon: FileQuestion, label: 'RFI-Queries', color: 'text-white' },
-  { path: '/site-operation', icon: MapPin, label: 'Site Operation', color: 'text-white' },
+  { path: '/', icon: Home, label: 'Dashboard', color: 'text-white', roles: ['admin'] },
+  { path: '/expenses', icon: Receipt, label: 'Expenses & Receipts', color: 'text-white', roles: ['admin'] },
+  { path: '/inventory', icon: Wrench, label: 'Equipment Inventory', color: 'text-white', roles: ['admin'] },
+  { path: '/tasks', icon: ClipboardList, label: 'Task Monitoring', color: 'text-white', roles: ['admin', 'designer'] },
+  { path: '/payroll', icon: DollarSign, label: 'Workers Payroll', color: 'text-white', roles: ['admin'] },
+  { path: '/employees', icon: Users, label: 'Employee Management', color: 'text-white', roles: ['admin'] },
+  { path: '/vehicles', icon: Car, label: 'Vehicle Monitoring', color: 'text-white', roles: ['admin'] },
+  { path: '/rfi-queries', icon: FileQuestion, label: 'RFI-Queries', color: 'text-white', roles: ['admin'] },
+  { path: '/site-operation', icon: MapPin, label: 'Site Operation', color: 'text-white', roles: ['admin'] },
 ]
 
-function Sidebar({ isCollapsed, toggleSidebar, onLogout, isMobile, closeMobileSidebar }) {
+function Sidebar({ isCollapsed, toggleSidebar, onLogout, isMobile, closeMobileSidebar, userRole }) {
   const location = useLocation()
+
+  // Filter navigation items based on user role
+  const filteredNavItems = navigationItems.filter(item => 
+    item.roles.includes(userRole)
+  )
 
   return (
     <motion.div
@@ -87,7 +93,7 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout, isMobile, closeMobileSi
 
       {/* Navigation items */}
       <nav className="flex-1 p-2 space-y-1">
-        {navigationItems.map((item, index) => {
+        {filteredNavItems.map((item, index) => {
           const Icon = item.icon
           const isActive = location.pathname === item.path
 
@@ -112,8 +118,6 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout, isMobile, closeMobileSi
 
                 <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-[#0e1048]' : item.color}`} />
 
-
-
                   <AnimatePresence mode="wait">
                     {(!isCollapsed || isMobile) && (
                       <motion.span
@@ -122,8 +126,6 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout, isMobile, closeMobileSi
                         exit={{ opacity: 0, x: -10 }}
                         transition={{ duration: 0.2 }}
                         className={`font-medium whitespace-nowrap ${isActive ? 'text-[#0e1048]' : 'text-[var(--color-sidebar-foreground)]'}`}
-
-
                       >
                         {item.label}
                       </motion.span>
@@ -137,8 +139,6 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout, isMobile, closeMobileSi
                     className={`absolute right-2 w-2 h-2 rounded-full bg-[#0e1048]`}
                   />
                 )}
-
-
 
                   {/* Tooltip for collapsed state */}
                   {isCollapsed && !isMobile && (
@@ -187,7 +187,6 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout, isMobile, closeMobileSi
   </motion.button>
 </div>
 
-
       {/* Footer status indicator */}
       <div className="p-4 border-t border-[var(--color-sidebar-border)]">
   <motion.div
@@ -222,8 +221,23 @@ function Sidebar({ isCollapsed, toggleSidebar, onLogout, isMobile, closeMobileSi
   )
 }
 
-function MainContent({ sidebarCollapsed, onLogout, isMobile }) {
+function MainContent({ sidebarCollapsed, onLogout, isMobile, userRole }) {
   const location = useLocation()
+
+  // Role-based route protection
+  const ProtectedComponent = ({ component: Component, allowedRoles }) => {
+    if (!allowedRoles.includes(userRole)) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h2>
+            <p className="text-gray-600">You don't have permission to access this page.</p>
+          </div>
+        </div>
+      )
+    }
+    return <Component />
+  }
 
   return (
     <motion.main
@@ -244,15 +258,23 @@ function MainContent({ sidebarCollapsed, onLogout, isMobile }) {
         className="p-6"
       >
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/expenses" element={<ExpensesReceipts />} />
-          <Route path="/inventory" element={<EquipmentInventory />} />
-          <Route path="/tasks" element={<TaskMonitoring />} />
-          <Route path="/payroll" element={<WorkersPayroll />} />
-          <Route path="/employees" element={<Employee />} />
-          <Route path="/vehicles" element={<VehicleMonitoring />} />
-          <Route path="/rfi-queries" element={<RFIQueries />} />
-          <Route path="/site-operation" element={<SiteOperation />} />
+          {/* Default route for designer - redirect to tasks */}
+          {userRole === 'designer' && (
+            <Route path="/" element={<Navigate to="/tasks" replace />} />
+          )}
+          
+          {/* Admin routes */}
+          <Route path="/" element={<ProtectedComponent component={Dashboard} allowedRoles={['admin']} />} />
+          <Route path="/expenses" element={<ProtectedComponent component={ExpensesReceipts} allowedRoles={['admin']} />} />
+          <Route path="/inventory" element={<ProtectedComponent component={EquipmentInventory} allowedRoles={['admin']} />} />
+          <Route path="/payroll" element={<ProtectedComponent component={WorkersPayroll} allowedRoles={['admin']} />} />
+          <Route path="/employees" element={<ProtectedComponent component={Employee} allowedRoles={['admin']} />} />
+          <Route path="/vehicles" element={<ProtectedComponent component={VehicleMonitoring} allowedRoles={['admin']} />} />
+          <Route path="/rfi-queries" element={<ProtectedComponent component={RFIQueries} allowedRoles={['admin']} />} />
+          <Route path="/site-operation" element={<ProtectedComponent component={SiteOperation} allowedRoles={['admin']} />} />
+          
+          {/* Shared routes (admin and designer) */}
+          <Route path="/tasks" element={<ProtectedComponent component={TaskMonitoring} allowedRoles={['admin', 'designer']} />} />
         </Routes>
       </motion.div>
     </motion.main>
@@ -264,13 +286,23 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [user, setUser] = useState(null)
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     // Check if user is already authenticated on app load
-    if (isAuthenticated()) {
-      setIsLoggedIn(true)
-      setUser(getUser())
+    const checkAuth = () => {
+      if (isAuthenticated()) {
+        const userData = getUser()
+        setIsLoggedIn(true)
+        setUser(userData)
+      } else {
+        setIsLoggedIn(false)
+        setUser(null)
+      }
+      setLoading(false)
     }
+
+    checkAuth()
 
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 768)
@@ -312,6 +344,20 @@ function App() {
     }
   }
 
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)]">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  // Always show login page if not authenticated
+  if (!isLoggedIn) {
+    return <LoginPage onLogin={handleLogin} />
+  }
+
   return (
     <Router>
       <div className="min-h-screen bg-[var(--color-background)] text-[var(--color-foreground)]">
@@ -327,20 +373,21 @@ function App() {
             </Button>
           </div>
         )}
-        <ProtectedRoute onLogin={handleLogin}>
-          <Sidebar
-            isCollapsed={sidebarCollapsed}
-            toggleSidebar={toggleSidebar}
-            onLogout={handleLogout}
-            isMobile={isMobile}
-            closeMobileSidebar={closeMobileSidebar}
-          />
-          <MainContent
-            sidebarCollapsed={sidebarCollapsed}
-            onLogout={handleLogout}
-            isMobile={isMobile}
-          />
-        </ProtectedRoute>
+        
+        <Sidebar
+          isCollapsed={sidebarCollapsed}
+          toggleSidebar={toggleSidebar}
+          onLogout={handleLogout}
+          isMobile={isMobile}
+          closeMobileSidebar={closeMobileSidebar}
+          userRole={user?.role}
+        />
+        <MainContent
+          sidebarCollapsed={sidebarCollapsed}
+          onLogout={handleLogout}
+          isMobile={isMobile}
+          userRole={user?.role}
+        />
       </div>
     </Router>
   )

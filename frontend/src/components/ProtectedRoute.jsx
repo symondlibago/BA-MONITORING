@@ -1,48 +1,64 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { isAuthenticated, getUser } from '../utils/auth'
 import LoginPage from './LoginPage'
 
-const ProtectedRoute = ({ children, onLogin }) => {
-  const [isAuth, setIsAuth] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+const ProtectedRoute = ({ children, onLogin, requiredRole = null }) => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Check authentication status
     const checkAuth = () => {
-      const authenticated = isAuthenticated()
-      const userData = getUser()
-      
-      setIsAuth(authenticated)
-      setUser(userData)
-      setIsLoading(false)
+      if (isAuthenticated()) {
+        const userData = getUser()
+        setUser(userData)
+        setIsLoggedIn(true)
+      } else {
+        setIsLoggedIn(false)
+        setUser(null)
+      }
+      setLoading(false)
     }
 
     checkAuth()
   }, [])
 
   const handleLogin = (userData) => {
-    setIsAuth(true)
+    setIsLoggedIn(true)
     setUser(userData)
     if (onLogin) {
       onLogin(userData)
     }
   }
 
-  if (isLoading) {
+  // Show loading while checking authentication
+  if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-          <span className="text-gray-600">Loading...</span>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  // Show login page if not authenticated
+  if (!isLoggedIn) {
+    return <LoginPage onLogin={handleLogin} />
+  }
+
+  // Check role-based access if required
+  if (requiredRole && user?.role !== requiredRole && !user?.role?.includes?.(requiredRole)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
+          <p className="text-gray-600">You don't have permission to access this page.</p>
         </div>
       </div>
     )
   }
 
-  if (!isAuth) {
-    return <LoginPage onLogin={handleLogin} />
-  }
-
+  // Render protected content
   return children
 }
 

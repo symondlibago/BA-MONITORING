@@ -1252,7 +1252,7 @@ function SiteOperation() {
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: 20 }}
                               transition={{ duration: 0.3, delay: index * 0.05 }}
-                              className="border-b border-[var(--color-border)]/50 hover:bg-[var(--color-muted)]/30 transition-colors"
+                              className="border-b border-[var(--color-border)]/50 hover:bg-gray-100 transition-colors"
                             >
                               <td className="py-3 px-4">
                                 <Button
@@ -1328,7 +1328,7 @@ function SiteOperation() {
                                   transition={{ duration: 0.3 }}
                                 >
                                   <td colSpan="5" className="py-0 px-4">
-                                    <div className="bg-[var(--color-muted)]/20 rounded-lg p-4 mb-4">
+                                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
                                       <div className="flex items-center justify-between mb-4">
                                         <h4 className="text-lg font-semibold text-[var(--color-foreground)]">
                                           Daily Updates

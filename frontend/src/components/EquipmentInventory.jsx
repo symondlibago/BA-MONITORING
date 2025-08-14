@@ -1248,7 +1248,7 @@ const EquipmentInventory = () => {
                                 animate={{ y: 0, opacity: 1 }}
                                 exit={{ y: -10, opacity: 0 }}
                                 transition={{ delay: 0.1 }}
-                                className="bg-[var(--color-muted)]/30 rounded-lg p-4 mb-4"
+                                className="bg-gray-100 rounded-lg p-4 mb-4"
                               >
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                   <div>

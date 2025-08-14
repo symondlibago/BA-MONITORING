@@ -12,6 +12,11 @@ import benoya2 from '../assets/benoya2.jpg';
 import benoya3 from '../assets/benoya3.jpg';
 import benoya4 from '../assets/benoya4.jpg';
 import benoya5 from '../assets/benoya5.jpg';
+import benoya6 from '../assets/benoya6.jpg';
+import benoya7 from '../assets/benoya7.jpg';
+import benoya8 from '../assets/benoya8.jpg';
+import benoya9 from '../assets/benoya9.jpg';
+import benoya10 from '../assets/benoya10.jpg';
 
 // API configuration
 
@@ -24,12 +29,12 @@ const LoginPage = ({ onLogin }) => {
   const [currentSlide, setCurrentSlide] = useState(0)
 
   // Array of imported images
-  const benoyaImages = [benoya1, benoya2, benoya3, benoya4, benoya5];
+  const benoyaImages = [benoya1, benoya2, benoya3, benoya4, benoya5, benoya6, benoya7, benoya8, benoya9, benoya10];
 
   // Background slideshow effect
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % 5)
+      setCurrentSlide((prev) => (prev + 1) % 10)
     }, 5000) // Change slide every 5 seconds
 
     return () => clearInterval(interval)
@@ -148,7 +153,7 @@ const LoginPage = ({ onLogin }) => {
                   Monitoring Systems
                 </h1>
                 <p className="text-[var(--color-foreground)]/70 text-sm">
-                  Welcome to BA Monitoring Dashboard
+                  Welcome to Benoya Archistruction Monitoring 
                 </p>
               </motion.div>
 
