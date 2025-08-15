@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent } from '@/components/ui/card.jsx'
+import API_BASE_URL from './Config'
 
 // Custom Dropdown Component
 const CustomDropdown = React.memo(({ label, required = false, value, onChange, options, placeholder, disabled = false }) => {
@@ -730,8 +731,6 @@ const EquipmentInventory = () => {
     borrow: { isOpen: false, isSubmitting: false, equipment: null },
     delete: { isOpen: false, isDeleting: false, equipment: null }
   })
-
-  const API_BASE_URL = 'http://localhost:8000/api'
 
   // Alert function
   const showAlert = useCallback((message, type = 'info') => {
