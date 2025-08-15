@@ -6,6 +6,7 @@ use App\Models\Vehicle;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
 
 class VehicleController extends Controller
 {
@@ -17,6 +18,7 @@ class VehicleController extends Controller
         return [
             'vehicle_name' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
             'lto_renewal_date' => ($isUpdate ? 'sometimes|' : '') . 'required|date',
+            'maintenance_date' => ($isUpdate ? 'sometimes|' : '') . 'nullable|date',
             'description' => 'nullable|string',
             'status' => ($isUpdate ? 'sometimes|' : '') . 'nullable|in:pending,complete',
             'images' => 'nullable|array|max:10',
@@ -55,15 +57,34 @@ class VehicleController extends Controller
     }
 
     /**
-     * Get all vehicles
+     * Get all vehicles with alert information
      */
     public function index(): JsonResponse
     {
         try {
             $vehicles = Vehicle::orderBy('created_at', 'desc')->get();
+            
+            // Add alert information to each vehicle
+            $vehiclesWithAlerts = $vehicles->map(function ($vehicle) {
+                return [
+                    'id' => $vehicle->id,
+                    'vehicle_name' => $vehicle->vehicle_name,
+                    'lto_renewal_date' => $vehicle->lto_renewal_date,
+                    'maintenance_date' => $vehicle->maintenance_date,
+                    'description' => $vehicle->description,
+                    'status' => $vehicle->status,
+                    'images' => $vehicle->images,
+                    'created_at' => $vehicle->created_at,
+                    'updated_at' => $vehicle->updated_at,
+                    'lto_renewal_alert' => $vehicle->lto_renewal_alert,
+                    'maintenance_alert' => $vehicle->maintenance_alert,
+                    'overall_alert' => $vehicle->overall_alert
+                ];
+            });
+
             return response()->json([
                 'success' => true,
-                'data' => $vehicles
+                'data' => $vehiclesWithAlerts
             ]);
         } catch (\Throwable $e) {
             return $this->errorResponse('Failed to fetch vehicles', $e);
@@ -91,15 +112,32 @@ class VehicleController extends Controller
             $vehicle = Vehicle::create([
                 'vehicle_name' => $request->vehicle_name,
                 'lto_renewal_date' => $request->lto_renewal_date,
+                'maintenance_date' => $request->maintenance_date,
                 'description' => $request->description ?? '',
                 'status' => $request->status ?? 'pending',
                 'images' => json_encode($imageData),
             ]);
 
+            // Add alert information to response
+            $vehicleWithAlerts = [
+                'id' => $vehicle->id,
+                'vehicle_name' => $vehicle->vehicle_name,
+                'lto_renewal_date' => $vehicle->lto_renewal_date,
+                'maintenance_date' => $vehicle->maintenance_date,
+                'description' => $vehicle->description,
+                'status' => $vehicle->status,
+                'images' => $vehicle->images,
+                'created_at' => $vehicle->created_at,
+                'updated_at' => $vehicle->updated_at,
+                'lto_renewal_alert' => $vehicle->lto_renewal_alert,
+                'maintenance_alert' => $vehicle->maintenance_alert,
+                'overall_alert' => $vehicle->overall_alert
+            ];
+
             return response()->json([
                 'success' => true,
                 'message' => 'Vehicle created successfully',
-                'data' => $vehicle
+                'data' => $vehicleWithAlerts
             ], 201);
 
         } catch (\Throwable $e) {
@@ -122,9 +160,25 @@ class VehicleController extends Controller
                 ], 404);
             }
 
+            // Add alert information to response
+            $vehicleWithAlerts = [
+                'id' => $vehicle->id,
+                'vehicle_name' => $vehicle->vehicle_name,
+                'lto_renewal_date' => $vehicle->lto_renewal_date,
+                'maintenance_date' => $vehicle->maintenance_date,
+                'description' => $vehicle->description,
+                'status' => $vehicle->status,
+                'images' => $vehicle->images,
+                'created_at' => $vehicle->created_at,
+                'updated_at' => $vehicle->updated_at,
+                'lto_renewal_alert' => $vehicle->lto_renewal_alert,
+                'maintenance_alert' => $vehicle->maintenance_alert,
+                'overall_alert' => $vehicle->overall_alert
+            ];
+
             return response()->json([
                 'success' => true,
-                'data' => $vehicle
+                'data' => $vehicleWithAlerts
             ]);
 
         } catch (\Throwable $e) {
@@ -176,6 +230,10 @@ class VehicleController extends Controller
                 $updateData['lto_renewal_date'] = $request->lto_renewal_date;
             }
             
+            if ($request->has('maintenance_date')) {
+                $updateData['maintenance_date'] = $request->maintenance_date;
+            }
+            
             if ($request->has('description')) {
                 $updateData['description'] = $request->description;
             }
@@ -189,10 +247,26 @@ class VehicleController extends Controller
 
             $vehicle->update($updateData);
 
+            // Add alert information to response
+            $vehicleWithAlerts = [
+                'id' => $vehicle->id,
+                'vehicle_name' => $vehicle->vehicle_name,
+                'lto_renewal_date' => $vehicle->lto_renewal_date,
+                'maintenance_date' => $vehicle->maintenance_date,
+                'description' => $vehicle->description,
+                'status' => $vehicle->status,
+                'images' => $vehicle->images,
+                'created_at' => $vehicle->created_at,
+                'updated_at' => $vehicle->updated_at,
+                'lto_renewal_alert' => $vehicle->lto_renewal_alert,
+                'maintenance_alert' => $vehicle->maintenance_alert,
+                'overall_alert' => $vehicle->overall_alert
+            ];
+
             return response()->json([
                 'success' => true,
                 'message' => 'Vehicle updated successfully',
-                'data' => $vehicle->fresh()
+                'data' => $vehicleWithAlerts
             ]);
 
         } catch (\Throwable $e) {
@@ -258,10 +332,26 @@ class VehicleController extends Controller
                 'status' => $request->status
             ]);
 
+            // Add alert information to response
+            $vehicleWithAlerts = [
+                'id' => $vehicle->id,
+                'vehicle_name' => $vehicle->vehicle_name,
+                'lto_renewal_date' => $vehicle->lto_renewal_date,
+                'maintenance_date' => $vehicle->maintenance_date,
+                'description' => $vehicle->description,
+                'status' => $vehicle->status,
+                'images' => $vehicle->images,
+                'created_at' => $vehicle->created_at,
+                'updated_at' => $vehicle->updated_at,
+                'lto_renewal_alert' => $vehicle->lto_renewal_alert,
+                'maintenance_alert' => $vehicle->maintenance_alert,
+                'overall_alert' => $vehicle->overall_alert
+            ];
+
             return response()->json([
                 'success' => true,
                 'message' => 'Vehicle status updated successfully',
-                'data' => $vehicle->fresh()
+                'data' => $vehicleWithAlerts
             ]);
 
         } catch (\Throwable $e) {
@@ -286,9 +376,27 @@ class VehicleController extends Controller
                               ->orderBy('created_at', 'desc')
                               ->get();
 
+            // Add alert information to each vehicle
+            $vehiclesWithAlerts = $vehicles->map(function ($vehicle) {
+                return [
+                    'id' => $vehicle->id,
+                    'vehicle_name' => $vehicle->vehicle_name,
+                    'lto_renewal_date' => $vehicle->lto_renewal_date,
+                    'maintenance_date' => $vehicle->maintenance_date,
+                    'description' => $vehicle->description,
+                    'status' => $vehicle->status,
+                    'images' => $vehicle->images,
+                    'created_at' => $vehicle->created_at,
+                    'updated_at' => $vehicle->updated_at,
+                    'lto_renewal_alert' => $vehicle->lto_renewal_alert,
+                    'maintenance_alert' => $vehicle->maintenance_alert,
+                    'overall_alert' => $vehicle->overall_alert
+                ];
+            });
+
             return response()->json([
                 'success' => true,
-                'data' => $vehicles
+                'data' => $vehiclesWithAlerts
             ]);
 
         } catch (\Throwable $e) {
@@ -314,13 +422,104 @@ class VehicleController extends Controller
                                   ->get();
             }
 
+            // Add alert information to each vehicle
+            $vehiclesWithAlerts = $vehicles->map(function ($vehicle) {
+                return [
+                    'id' => $vehicle->id,
+                    'vehicle_name' => $vehicle->vehicle_name,
+                    'lto_renewal_date' => $vehicle->lto_renewal_date,
+                    'maintenance_date' => $vehicle->maintenance_date,
+                    'description' => $vehicle->description,
+                    'status' => $vehicle->status,
+                    'images' => $vehicle->images,
+                    'created_at' => $vehicle->created_at,
+                    'updated_at' => $vehicle->updated_at,
+                    'lto_renewal_alert' => $vehicle->lto_renewal_alert,
+                    'maintenance_alert' => $vehicle->maintenance_alert,
+                    'overall_alert' => $vehicle->overall_alert
+                ];
+            });
+
             return response()->json([
                 'success' => true,
-                'data' => $vehicles
+                'data' => $vehiclesWithAlerts
             ]);
 
         } catch (\Throwable $e) {
             return $this->errorResponse('Failed to search vehicles', $e);
+        }
+    }
+
+    /**
+     * Get vehicles with alerts (for dashboard)
+     */
+    public function getVehicleAlerts(): JsonResponse
+    {
+        try {
+            $vehicles = Vehicle::withAlerts()->get();
+            
+            $alerts = [];
+            $warningCount = 0;
+            $overdueCount = 0;
+
+            foreach ($vehicles as $vehicle) {
+                $ltoAlert = $vehicle->lto_renewal_alert;
+                $maintenanceAlert = $vehicle->maintenance_alert;
+
+                // Add LTO renewal alerts
+                if ($ltoAlert['status'] !== 'none') {
+                    $alerts[] = [
+                        'vehicle_id' => $vehicle->id,
+                        'vehicle_name' => $vehicle->vehicle_name,
+                        'type' => 'lto_renewal',
+                        'status' => $ltoAlert['status'],
+                        'message' => $ltoAlert['message'],
+                        'days_remaining' => $ltoAlert['days_remaining'],
+                        'date' => $vehicle->lto_renewal_date
+                    ];
+
+                    if ($ltoAlert['status'] === 'overdue') {
+                        $overdueCount++;
+                    } else {
+                        $warningCount++;
+                    }
+                }
+
+                // Add maintenance alerts
+                if ($maintenanceAlert['status'] !== 'none') {
+                    $alerts[] = [
+                        'vehicle_id' => $vehicle->id,
+                        'vehicle_name' => $vehicle->vehicle_name,
+                        'type' => 'maintenance',
+                        'status' => $maintenanceAlert['status'],
+                        'message' => $maintenanceAlert['message'],
+                        'days_remaining' => $maintenanceAlert['days_remaining'],
+                        'date' => $vehicle->maintenance_date
+                    ];
+
+                    if ($maintenanceAlert['status'] === 'overdue') {
+                        $overdueCount++;
+                    } else {
+                        $warningCount++;
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'alerts' => $alerts,
+                    'summary' => [
+                        'total_alerts' => count($alerts),
+                        'warning_count' => $warningCount,
+                        'overdue_count' => $overdueCount,
+                        'vehicles_with_alerts' => $vehicles->count()
+                    ]
+                ]
+            ]);
+
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to fetch vehicle alerts', $e);
         }
     }
 }

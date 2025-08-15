@@ -230,7 +230,7 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
         sizeDimension: initialData.size_dimension || '',
         unitPrice: initialData.unit_price || '',
         totalPrice: initialData.total_price || '',
-        mop: initialData.mop || 'PDC',
+        mop: initialData.mop || '',
         mopDescription: initialData.mop_description || '',
         category: initialData.category || 'Plumbing',
         location: initialData.location || '',
@@ -327,7 +327,8 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
   const mopOptions = [
     { value: 'PDC', label: 'PDC' },
     { value: 'PO', label: 'PO' },
-    { value: 'CARD', label: 'CARD' }
+    { value: 'CARD', label: 'CARD' },
+    { value: 'CASH', label: 'CASH' }
   ]
 
   const categoryOptions = categories.filter(cat => cat !== 'All').map(category => ({

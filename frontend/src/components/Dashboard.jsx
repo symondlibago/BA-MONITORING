@@ -10,7 +10,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Car
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Button } from '@/components/ui/button.jsx'
@@ -30,6 +31,32 @@ function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
+
+  // Helper function to check if a date is overdue or due soon
+  const checkDateAlert = (dateString, alertDays = 30) => {
+    if (!dateString) return { status: 'none', message: '', daysDiff: 0 }
+    
+    const date = new Date(dateString)
+    const today = new Date()
+    const diffTime = date - today
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    
+    if (diffDays < 0) {
+      return {
+        status: 'overdue',
+        message: `Overdue by ${Math.abs(diffDays)} day(s)`,
+        daysDiff: diffDays
+      }
+    } else if (diffDays <= alertDays) {
+      return {
+        status: 'due_soon',
+        message: `Due in ${diffDays} day(s)`,
+        daysDiff: diffDays
+      }
+    }
+    
+    return { status: 'none', message: '', daysDiff: diffDays }
+  }
 
   // Fetch expenses data
   const fetchExpensesData = useCallback(async () => {
@@ -163,17 +190,85 @@ function Dashboard() {
     }
   }, [])
 
+  // Fetch vehicle data for alerts
+  const fetchVehicleData = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/vehicles`)
+      if (!response.ok) throw new Error('Failed to fetch vehicles')
+      
+      const data = await response.json()
+      if (data.success && data.data) {
+        const vehicles = data.data
+        
+        let overdueVehicles = []
+        let dueSoonVehicles = []
+        
+        vehicles.forEach(vehicle => {
+          const ltoAlert = checkDateAlert(vehicle.lto_renewal_date, 30)
+          const maintenanceAlert = checkDateAlert(vehicle.maintenance_date, 30)
+          
+          // Check for overdue items
+          if (ltoAlert.status === 'overdue') {
+            overdueVehicles.push({
+              vehicle: vehicle.vehicle_name,
+              type: 'LTO Renewal',
+              message: `${vehicle.vehicle_name} LTO renewal ${ltoAlert.message.toLowerCase()}`
+            })
+          }
+          
+          if (maintenanceAlert.status === 'overdue') {
+            overdueVehicles.push({
+              vehicle: vehicle.vehicle_name,
+              type: 'Maintenance',
+              message: `${vehicle.vehicle_name} maintenance ${maintenanceAlert.message.toLowerCase()}`
+            })
+          }
+          
+          // Check for due soon items
+          if (ltoAlert.status === 'due_soon') {
+            dueSoonVehicles.push({
+              vehicle: vehicle.vehicle_name,
+              type: 'LTO Renewal',
+              message: `${vehicle.vehicle_name} LTO renewal ${ltoAlert.message.toLowerCase()}`
+            })
+          }
+          
+          if (maintenanceAlert.status === 'due_soon') {
+            dueSoonVehicles.push({
+              vehicle: vehicle.vehicle_name,
+              type: 'Maintenance',
+              message: `${vehicle.vehicle_name} maintenance ${maintenanceAlert.message.toLowerCase()}`
+            })
+          }
+        })
+        
+        return {
+          totalVehicles: vehicles.length,
+          overdueCount: overdueVehicles.length,
+          dueSoonCount: dueSoonVehicles.length,
+          overdueVehicles,
+          dueSoonVehicles
+        }
+      }
+      return { totalVehicles: 0, overdueCount: 0, dueSoonCount: 0, overdueVehicles: [], dueSoonVehicles: [] }
+    } catch (error) {
+      console.error('Error fetching vehicles:', error)
+      return { totalVehicles: 0, overdueCount: 0, dueSoonCount: 0, overdueVehicles: [], dueSoonVehicles: [] }
+    }
+  }, [])
+
   // Main data fetching function
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
       
-      const [expensesData, equipmentData, tasksData, payrollData] = await Promise.all([
+      const [expensesData, equipmentData, tasksData, payrollData, vehicleData] = await Promise.all([
         fetchExpensesData(),
         fetchEquipmentData(),
         fetchTasksData(),
-        fetchPayrollData()
+        fetchPayrollData(),
+        fetchVehicleData()
       ])
       
       // Update dashboard stats
@@ -248,9 +343,10 @@ function Dashboard() {
       // Sort activities by time and take the most recent ones
       setRecentActivities(activities.slice(0, 4))
       
-      // Build alerts
+      // Build alerts including vehicle alerts
       const newAlerts = []
       
+      // Equipment alerts
       if (equipmentData.maintenanceCount > 0) {
         newAlerts.push({
           type: 'warning',
@@ -269,6 +365,7 @@ function Dashboard() {
         })
       }
       
+      // Task alerts
       if (tasksData.value === 0 && tasksData.totalTasks > 0) {
         newAlerts.push({
           type: 'success',
@@ -285,6 +382,30 @@ function Dashboard() {
         })
       }
       
+      // Vehicle alerts - overdue items (critical)
+      if (vehicleData.overdueCount > 0) {
+        vehicleData.overdueVehicles.forEach(item => {
+          newAlerts.push({
+            type: 'critical',
+            message: item.message,
+            icon: Car,
+            color: 'text-red-600'
+          })
+        })
+      }
+      
+      // Vehicle alerts - due soon items (warning)
+      if (vehicleData.dueSoonCount > 0) {
+        vehicleData.dueSoonVehicles.forEach(item => {
+          newAlerts.push({
+            type: 'warning',
+            message: item.message,
+            icon: Car,
+            color: 'text-yellow-600'
+          })
+        })
+      }
+      
       setAlerts(newAlerts)
       setLastUpdated(new Date())
       
@@ -294,7 +415,7 @@ function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [fetchExpensesData, fetchEquipmentData, fetchTasksData, fetchPayrollData])
+  }, [fetchExpensesData, fetchEquipmentData, fetchTasksData, fetchPayrollData, fetchVehicleData])
 
   // Helper function to format time ago
   const formatTimeAgo = (dateString) => {
@@ -463,13 +584,13 @@ function Dashboard() {
                       stat.value
                     )}
                   </div>
-                  {!loading && (
-                    <div className="flex items-center space-x-1 text-xs">
-                      <TrendingUp className="h-3 w-3 text-[var(--color-primary)]" />
-                      <span className="text-[var(--color-primary)]">{stat.change}</span>
-                      <span className="text-[var(--color-foreground)]/70">from last month</span>
-                    </div>
-                  )}
+                  <p className={`text-xs ${
+                    parseFloat(stat.change) >= 0 
+                      ? 'text-green-600' 
+                      : 'text-red-600'
+                  } mt-1`}>
+                    {stat.change} from last month
+                  </p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -477,55 +598,61 @@ function Dashboard() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Activities */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.4 }}
+          className="lg:col-span-2"
         >
-          <Card className="bg-[var(--color-card)] border-[var(--color-border)] shadow-md">
+          <Card className="bg-[var(--color-card)] border border-[var(--color-border)] shadow-md">
             <CardHeader>
-              <CardTitle className="text-xl font-semibold text-[var(--color-foreground)] flex items-center space-x-2">
-                <Users className="h-5 w-5 text-[var(--color-primary)]" />
-                <span>Recent Activities</span>
+              <CardTitle className="text-[var(--color-foreground)] flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-[var(--color-primary)]" />
+                Recent Activities
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               {loading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-[var(--color-primary)]" />
+                  <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
                 </div>
-              ) : recentActivities.length === 0 ? (
-                <div className="text-center py-8 text-[var(--color-foreground)]/70">
-                  No recent activities found
+              ) : recentActivities.length > 0 ? (
+                <div className="space-y-3">
+                  {recentActivities.map((activity, index) => {
+                    const Icon = activity.icon
+                    return (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.1 }}
+                        className="flex items-center gap-3"
+                      >
+                        <Icon className={`h-4 w-4 ${activity.color}`} />
+                        <div className="flex-1">
+                          <p className="text-sm text-[var(--color-foreground)]">
+                            {activity.message}
+                          </p>
+                          <p className="text-xs text-[var(--color-foreground)]/60">
+                            {activity.time}
+                          </p>
+                        </div>
+                        {activity.amount && (
+                          <div className="text-sm font-semibold text-[var(--color-primary)]">
+                            {activity.amount}
+                          </div>
+                        )}
+                      </motion.div>
+                    )
+                  })}
                 </div>
               ) : (
-                recentActivities.map((activity, index) => {
-                  const Icon = activity.icon
-                  return (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: 0.5 + index * 0.1 }}
-                      className="flex items-center space-x-3 p-3 rounded-lg bg-[var(--color-card)]/50 hover:bg-[var(--color-card)]/70 transition-colors duration-200"
-                    >
-                      <div className="p-2 rounded-full bg-[var(--color-card)]">
-                        <Icon className={`h-4 w-4 ${activity.color}`} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-[var(--color-foreground)]">{activity.message}</p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-[var(--color-foreground)]/70">{activity.time}</span>
-                          {activity.amount && (
-                            <span className="text-sm font-semibold text-[var(--color-primary)]">{activity.amount}</span>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  )
-                })
+                <div className="text-center py-8 text-[var(--color-foreground)]/60">
+                  No recent activities
+                </div>
               )}
             </CardContent>
           </Card>
@@ -535,49 +662,53 @@ function Dashboard() {
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
         >
-          <Card className="bg-[var(--color-card)] border-[var(--color-border)] shadow-md">
+          <Card className="bg-[var(--color-card)] border border-[var(--color-border)] shadow-md">
             <CardHeader>
-              <CardTitle className="text-xl font-semibold text-[var(--color-foreground)] flex items-center space-x-2">
+              <CardTitle className="text-[var(--color-foreground)] flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-[var(--color-primary)]" />
-                <span>System Alerts</span>
+                System Alerts
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               {loading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-[var(--color-primary)]" />
+                  <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
                 </div>
-              ) : alerts.length === 0 ? (
-                <div className="text-center py-8 text-[var(--color-foreground)]/70">
-                  <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                  All systems running smoothly
+              ) : alerts.length > 0 ? (
+                <div className="space-y-3">
+                  {alerts.map((alert, index) => {
+                    const Icon = alert.icon
+                    
+                    return (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.3, delay: index * 0.1 }}
+                        className="flex items-center gap-3"
+                      >
+                        <Icon className={`h-4 w-4 ${alert.color}`} />
+                        <p className="text-sm text-[var(--color-foreground)] flex-1">
+                          {alert.message}
+                        </p>
+                      </motion.div>
+                    )
+                  })}
                 </div>
               ) : (
-                alerts.map((alert, index) => {
-                  const Icon = alert.icon
-                  return (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3, delay: 0.7 + index * 0.1 }}
-                      className="flex items-center space-x-3 p-3 rounded-lg bg-[var(--color-card)]/50 hover:bg-[var(--color-card)]/70 transition-colors duration-200"
-                    >
-                      <div className="p-2 rounded-full bg-[var(--color-card)]">
-                        <Icon className={`h-4 w-4 ${alert.color}`} />
-                      </div>
-                      <p className="text-sm text-[var(--color-foreground)] flex-1">{alert.message}</p>
-                    </motion.div>
-                  )
-                })
+                <div className="text-center py-8">
+                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
+                  <p className="text-sm text-[var(--color-foreground)]/60">
+                    All systems running smoothly
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
         </motion.div>
       </div>
-
     </div>
   )
 }

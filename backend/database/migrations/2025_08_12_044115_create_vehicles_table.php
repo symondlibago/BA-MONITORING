@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string("vehicle_name");
             $table->date("lto_renewal_date");
+            $table->date('maintenance_date')->nullable();
             $table->text("description")->nullable();
             $table->string("status")->default("pending"); // pending, complete
             $table->longText("images")->nullable(); // Changed to longText to store base64 encoded images like RFI
