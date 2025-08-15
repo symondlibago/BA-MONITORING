@@ -7,7 +7,7 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'https://ba-monitoring-m8k0op2he-symonds-projects.vercel.app',
+        'https://ba-monitoring.vercel.app',
     ],
 
     'allowed_origins_patterns' => [],
