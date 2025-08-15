@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react'
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, 
@@ -1200,10 +1200,13 @@ const WorkersPayroll = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   
   // Success alert
   const [showSuccessAlert, setShowSuccessAlert] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const selectAllRef = useRef(null)
 
   // Fetch payroll records
   const fetchPayrollRecords = useCallback(async () => {
@@ -1426,6 +1429,87 @@ const WorkersPayroll = () => {
       </span>
     )
   })
+
+  const isAllVisibleSelected = useMemo(() => {
+    if (!filteredRecords.length) return false
+    const visibleIds = new Set(filteredRecords.map(r => r.id))
+    for (const id of visibleIds) {
+      if (!selectedIds.has(id)) return false
+    }
+    return true
+  }, [filteredRecords, selectedIds])
+
+  const isIndeterminate = useMemo(() => {
+    if (!filteredRecords.length) return false
+    const visibleIds = new Set(filteredRecords.map(r => r.id))
+    let selectedCount = 0
+    for (const id of visibleIds) {
+      if (selectedIds.has(id)) selectedCount++
+    }
+    return selectedCount > 0 && selectedCount < visibleIds.size
+  }, [filteredRecords, selectedIds])
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = isIndeterminate
+    }
+  }, [isIndeterminate])
+
+  const toggleSelectAllVisible = useCallback(() => {
+    const visibleIds = filteredRecords.map(r => r.id)
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      const allSelected = visibleIds.every(id => next.has(id))
+      if (allSelected) {
+        visibleIds.forEach(id => next.delete(id))
+      } else {
+        visibleIds.forEach(id => next.add(id))
+      }
+      return next
+    })
+  }, [filteredRecords])
+
+  const toggleSelectOne = useCallback((id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedIds.size === 0) return
+    try {
+      setIsBulkDeleting(true)
+      const idsToDelete = Array.from(selectedIds)
+      // Prepare deletions per record type
+      const recordsById = new Map(payrollRecords.map(r => [r.id, r]))
+      const deletePromises = idsToDelete.map(id => {
+        const rec = recordsById.get(id)
+        if (!rec) return Promise.resolve()
+        const endpoint = rec.payroll_type === 'Site' ? 'payrolls' : 'office-payrolls'
+        return fetch(`${API_BASE_URL}/${endpoint}/${id}`, { method: 'DELETE' })
+          .then(r => r.json())
+      })
+      const results = await Promise.allSettled(deletePromises)
+      const anyFailure = results.some(r => r.status === 'fulfilled' ? (r.value && r.value.success === false) : r.status === 'rejected')
+      if (anyFailure) {
+        setError('Some records could not be deleted')
+      }
+      setSuccessMessage('Selected payroll records deleted successfully!')
+      setShowSuccessAlert(true)
+      clearSelection()
+      await fetchPayrollRecords()
+    } catch (e) {
+      console.error('Bulk delete failed:', e)
+      setError('Failed to delete selected records')
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }, [selectedIds, payrollRecords, fetchPayrollRecords, clearSelection])
 
   if (loading) {
     return (
@@ -1741,10 +1825,52 @@ const WorkersPayroll = () => {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="bg-white rounded-lg shadow-md overflow-hidden"
           >
+            {selectedIds.size > 0 && (
+              <div className="flex items-center justify-between px-4 py-3 border-b bg-blue-50">
+                <div className="text-sm text-blue-800">
+                  {isAllVisibleSelected ? `All ${filteredRecords.length} records on this page selected` : `${selectedIds.size} selected`}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={clearSelection}
+                    className="border-blue-200 text-blue-700 hover:text-blue-800 hover:border-blue-300"
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    onClick={handleBulkDelete}
+                    disabled={isBulkDeleting}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {isBulkDeleting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {isAllVisibleSelected ? 'Delete All Records' : 'Delete Selected'}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        checked={isAllVisibleSelected}
+                        onChange={toggleSelectAllVisible}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                      />
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pay Period</th>
@@ -1762,8 +1888,16 @@ const WorkersPayroll = () => {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.3, delay: index * 0.05 }}
-                      className="hover:bg-gray-50"
+                      className={`hover:bg-gray-50 ${selectedIds.has(record.id) ? 'bg-blue-50/50' : ''}`}
                     >
+                      <td className="px-4 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(record.id)}
+                          onChange={() => toggleSelectOne(record.id)}
+                          className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className={`p-2 rounded-lg mr-3 ${record.payroll_type === 'Site' ? 'bg-orange-100' : 'bg-blue-100'}`}>
