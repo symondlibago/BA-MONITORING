@@ -352,14 +352,47 @@ class PayrollController extends Controller
     }
 
     /**
-     * Update a payroll record
+     * Update a payroll record - Enhanced to support all fields
      */
     public function update(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
             'status' => 'nullable|in:Pending,Processing,Paid,On Hold',
+            'pay_period_start' => 'nullable|date',
+            'pay_period_end' => 'nullable|date|after_or_equal:pay_period_start',
+            'working_days' => 'nullable|integer|min:0|max:7',
+            'overtime_hours' => 'nullable|numeric|min:0',
+            'late_minutes' => 'nullable|numeric|min:0',
             'cash_advance' => 'nullable|numeric|min:0',
-            'others_deduction' => 'nullable|numeric|min:0'
+            'others_deduction' => 'nullable|numeric|min:0',
+            'daily_attendance' => 'nullable|array',
+            'daily_attendance.monday' => 'nullable|boolean',
+            'daily_attendance.tuesday' => 'nullable|boolean',
+            'daily_attendance.wednesday' => 'nullable|boolean',
+            'daily_attendance.thursday' => 'nullable|boolean',
+            'daily_attendance.friday' => 'nullable|boolean',
+            'daily_attendance.saturday' => 'nullable|boolean',
+            'daily_overtime' => 'nullable|array',
+            'daily_overtime.monday' => 'nullable|numeric|min:0',
+            'daily_overtime.tuesday' => 'nullable|numeric|min:0',
+            'daily_overtime.wednesday' => 'nullable|numeric|min:0',
+            'daily_overtime.thursday' => 'nullable|numeric|min:0',
+            'daily_overtime.friday' => 'nullable|numeric|min:0',
+            'daily_overtime.saturday' => 'nullable|numeric|min:0',
+            'daily_late' => 'nullable|array',
+            'daily_late.monday' => 'nullable|numeric|min:0',
+            'daily_late.tuesday' => 'nullable|numeric|min:0',
+            'daily_late.wednesday' => 'nullable|numeric|min:0',
+            'daily_late.thursday' => 'nullable|numeric|min:0',
+            'daily_late.friday' => 'nullable|numeric|min:0',
+            'daily_late.saturday' => 'nullable|numeric|min:0',
+            'daily_site_address' => 'nullable|array',
+            'daily_site_address.monday' => 'nullable|string',
+            'daily_site_address.tuesday' => 'nullable|string',
+            'daily_site_address.wednesday' => 'nullable|string',
+            'daily_site_address.thursday' => 'nullable|string',
+            'daily_site_address.friday' => 'nullable|string',
+            'daily_site_address.saturday' => 'nullable|string'
         ]);
 
         if ($validator->fails()) {
@@ -371,6 +404,8 @@ class PayrollController extends Controller
         }
 
         try {
+            DB::beginTransaction();
+
             $payroll = DB::table('payrolls')->where('id', $id)->first();
 
             if (!$payroll) {
@@ -380,31 +415,180 @@ class PayrollController extends Controller
                 ], 404);
             }
 
+            // Get employee details for recalculation
+            $employee = DB::table('employees')->where('id', $payroll->employee_id)->first();
+
+            if (!$employee) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found'
+                ], 404);
+            }
+
             // Prepare update data
             $updateData = ['updated_at' => now()];
             
+            // Update basic fields
             if ($request->has('status')) {
                 $updateData['status'] = $request->status;
             }
             
+            if ($request->has('pay_period_start')) {
+                $updateData['pay_period_start'] = $request->pay_period_start;
+            }
+            
+            if ($request->has('pay_period_end')) {
+                $updateData['pay_period_end'] = $request->pay_period_end;
+            }
+
+            // Check if any calculation-affecting fields are being updated
+            $needsRecalculation = false;
+            $calculationData = [
+                'working_days' => $payroll->working_days,
+                'overtime_hours' => $payroll->overtime_hours,
+                'late_minutes' => $payroll->late_minutes,
+                'cash_advance' => $payroll->cash_advance,
+                'others_deduction' => $payroll->others_deduction
+            ];
+
+            // Handle daily data updates
+            $dailyAttendance = json_decode($payroll->daily_attendance, true) ?: [];
+            $dailyOvertime = json_decode($payroll->daily_overtime, true) ?: [];
+            $dailyLate = json_decode($payroll->daily_late, true) ?: [];
+            $dailySiteAddress = json_decode($payroll->daily_site_address, true) ?: [];
+
+            if ($request->has('daily_attendance')) {
+                $dailyAttendance = $this->processDailyAttendance($request->daily_attendance);
+                $updateData['daily_attendance'] = json_encode($dailyAttendance);
+                
+                // Recalculate working days from daily attendance
+                $workingDaysCount = array_sum(array_values($dailyAttendance));
+                $updateData['working_days'] = $workingDaysCount;
+                $calculationData['working_days'] = $workingDaysCount;
+                $needsRecalculation = true;
+            }
+
+            if ($request->has('daily_overtime')) {
+                $dailyOvertime = $this->processDailyOvertime($request->daily_overtime);
+                $updateData['daily_overtime'] = json_encode($dailyOvertime);
+                
+                // Recalculate total overtime hours
+                $totalOvertimeHours = array_sum(array_values($dailyOvertime));
+                $updateData['overtime_hours'] = $totalOvertimeHours;
+                $calculationData['overtime_hours'] = $totalOvertimeHours;
+                $needsRecalculation = true;
+            }
+
+            if ($request->has('daily_late')) {
+                $dailyLate = $this->processDailyLate($request->daily_late);
+                $updateData['daily_late'] = json_encode($dailyLate);
+                
+                // Recalculate total late minutes
+                $totalLateMinutes = array_sum(array_values($dailyLate));
+                $updateData['late_minutes'] = $totalLateMinutes;
+                $calculationData['late_minutes'] = $totalLateMinutes;
+                $needsRecalculation = true;
+            }
+
+            if ($request->has('daily_site_address')) {
+                $dailySiteAddress = $this->processDailySiteAddress($request->daily_site_address);
+                $updateData['daily_site_address'] = json_encode($dailySiteAddress);
+            }
+
+            // Handle direct field updates
+            if ($request->has('working_days')) {
+                $updateData['working_days'] = $request->working_days;
+                $calculationData['working_days'] = $request->working_days;
+                $needsRecalculation = true;
+            }
+            
+            if ($request->has('overtime_hours')) {
+                $updateData['overtime_hours'] = $request->overtime_hours;
+                $calculationData['overtime_hours'] = $request->overtime_hours;
+                $needsRecalculation = true;
+            }
+            
+            if ($request->has('late_minutes')) {
+                $updateData['late_minutes'] = $request->late_minutes;
+                $calculationData['late_minutes'] = $request->late_minutes;
+                $needsRecalculation = true;
+            }
+            
             if ($request->has('cash_advance')) {
                 $updateData['cash_advance'] = $request->cash_advance;
+                $calculationData['cash_advance'] = $request->cash_advance;
+                $needsRecalculation = true;
             }
             
             if ($request->has('others_deduction')) {
                 $updateData['others_deduction'] = $request->others_deduction;
+                $calculationData['others_deduction'] = $request->others_deduction;
+                $needsRecalculation = true;
             }
 
-            // Recalculate totals if deductions changed
-            if ($request->has('cash_advance') || $request->has('others_deduction')) {
-                $cashAdvance = $request->has('cash_advance') ? $request->cash_advance : $payroll->cash_advance;
-                $othersDeduction = $request->has('others_deduction') ? $request->others_deduction : $payroll->others_deduction;
+            // Recalculate if necessary
+            if ($needsRecalculation) {
+                $calculations = $this->calculatePayrollWithDaily($employee, $calculationData, $dailyAttendance, $dailyOvertime, $dailyLate);
                 
-                $totalDeductions = $payroll->late_deduction + $cashAdvance + $othersDeduction;
-                $netPay = $payroll->gross_pay - $totalDeductions;
-                
-                $updateData['total_deductions'] = $totalDeductions;
-                $updateData['net_pay'] = $netPay;
+                $updateData['basic_salary'] = $calculations['basic_salary'];
+                $updateData['overtime_pay'] = $calculations['overtime_pay'];
+                $updateData['late_deduction'] = $calculations['late_deduction'];
+                $updateData['gross_pay'] = $calculations['gross_pay'];
+                $updateData['total_deductions'] = $calculations['total_deductions'];
+                $updateData['net_pay'] = $calculations['net_pay'];
+            }
+
+            // Handle ECA deduction updates if cash advance changed
+            if ($request->has('cash_advance')) {
+                $existingEca = DB::table('emergency_cash_advances')
+                    ->where('employee_id', $payroll->employee_id)
+                    ->where('status', 'active')
+                    ->first();
+
+                $existingEd = DB::table('emergency_deductions')
+                    ->where('employee_id', $payroll->employee_id)
+                    ->where('status', 'active')
+                    ->first();
+
+                if ($existingEca && $existingEd) {
+                    // Calculate the difference in cash advance
+                    $oldCashAdvance = $payroll->cash_advance;
+                    $newCashAdvance = $request->cash_advance;
+                    $difference = $newCashAdvance - $oldCashAdvance;
+
+                    if ($difference != 0) {
+                        $newBalance = $existingEca->remaining_balance - $difference;
+                        
+                        if ($newBalance <= 0) {
+                            // Mark ECA and ED as completed
+                            DB::table('emergency_cash_advances')
+                                ->where('employee_id', $payroll->employee_id)
+                                ->where('status', 'active')
+                                ->update([
+                                    'status' => 'completed',
+                                    'remaining_balance' => 0,
+                                    'updated_at' => now()
+                                ]);
+
+                            DB::table('emergency_deductions')
+                                ->where('employee_id', $payroll->employee_id)
+                                ->where('status', 'active')
+                                ->update([
+                                    'status' => 'completed',
+                                    'updated_at' => now()
+                                ]);
+                        } else {
+                            // Update remaining balance
+                            DB::table('emergency_cash_advances')
+                                ->where('employee_id', $payroll->employee_id)
+                                ->where('status', 'active')
+                                ->update([
+                                    'remaining_balance' => max(0, $newBalance),
+                                    'updated_at' => now()
+                                ]);
+                        }
+                    }
+                }
             }
 
             DB::table('payrolls')->where('id', $id)->update($updateData);
@@ -417,83 +601,18 @@ class PayrollController extends Controller
             $updatedPayroll->daily_late = json_decode($updatedPayroll->daily_late, true);
             $updatedPayroll->daily_site_address = json_decode($updatedPayroll->daily_site_address, true);
 
+            DB::commit();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Payroll record updated successfully',
                 'data' => $updatedPayroll
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update payroll record',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Get attendance details for a specific payroll record
-     */
-    public function getAttendanceDetails($id)
-    {
-        try {
-            $payroll = DB::table('payrolls')->where('id', $id)->first();
-
-            if (!$payroll) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Payroll record not found'
-                ], 404);
-            }
-
-            // Decode JSON fields
-            $dailyAttendance = json_decode($payroll->daily_attendance, true) ?: [];
-            $dailyOvertime = json_decode($payroll->daily_overtime, true) ?: [];
-            $dailyLate = json_decode($payroll->daily_late, true) ?: [];
-            $dailySiteAddress = json_decode($payroll->daily_site_address, true) ?: [];
-
-            // Format attendance data for frontend
-            $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-            $attendanceData = [];
-
-            foreach ($days as $day) {
-                $attendanceData[] = [
-                    'day' => ucfirst($day),
-                    'present' => isset($dailyAttendance[$day]) ? (bool)$dailyAttendance[$day] : false,
-                    'overtime' => isset($dailyOvertime[$day]) ? (string)$dailyOvertime[$day] : '0',
-                    'late' => isset($dailyLate[$day]) ? (string)$dailyLate[$day] : '0',
-                    'site_address' => isset($dailySiteAddress[$day]) ? (string)$dailySiteAddress[$day] : ''
-                ];
-            }
-
-            // Calculate summary
-            $summary = [
-                'days_present' => count(array_filter($dailyAttendance)),
-                'total_overtime' => array_sum($dailyOvertime),
-                'total_late' => array_sum($dailyLate),
-                'net_pay' => $payroll->net_pay
-            ];
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'employee_info' => [
-                        'id' => $payroll->employee_id,
-                        'name' => $payroll->employee_name,
-                        'group' => $payroll->employee_group,
-                        'employee_id' => $payroll->employee_code,
-                        'position' => $payroll->position,
-                        'department' => $payroll->payroll_type, // Using payroll_type as department
-                        'pay_period' => $payroll->pay_period_start . ' to ' . $payroll->pay_period_end
-                    ],
-                    'attendance_data' => $attendanceData,
-                    'summary' => $summary
-                ]
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch attendance details',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -530,6 +649,60 @@ class PayrollController extends Controller
     }
 
     /**
+     * Update payroll status
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|in:Pending,Processing,Paid,On Hold'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $payroll = DB::table('payrolls')->where('id', $id)->first();
+
+            if (!$payroll) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payroll record not found'
+                ], 404);
+            }
+
+            DB::table('payrolls')->where('id', $id)->update([
+                'status' => $request->status,
+                'updated_at' => now()
+            ]);
+
+            $updatedPayroll = DB::table('payrolls')->where('id', $id)->first();
+
+            // Decode JSON fields
+            $updatedPayroll->daily_attendance = json_decode($updatedPayroll->daily_attendance, true);
+            $updatedPayroll->daily_overtime = json_decode($updatedPayroll->daily_overtime, true);
+            $updatedPayroll->daily_late = json_decode($updatedPayroll->daily_late, true);
+            $updatedPayroll->daily_site_address = json_decode($updatedPayroll->daily_site_address, true);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payroll status updated successfully',
+                'data' => $updatedPayroll
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update payroll status',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Process daily attendance data
      */
     private function processDailyAttendance($dailyAttendance)
@@ -538,7 +711,7 @@ class PayrollController extends Controller
         $processed = [];
         
         foreach ($days as $day) {
-            $processed[$day] = isset($dailyAttendance[$day]) ? (bool)$dailyAttendance[$day] : false;
+            $processed[$day] = isset($dailyAttendance[$day]) ? (bool) $dailyAttendance[$day] : false;
         }
         
         return $processed;
@@ -553,7 +726,7 @@ class PayrollController extends Controller
         $processed = [];
         
         foreach ($days as $day) {
-            $processed[$day] = isset($dailyOvertime[$day]) ? (float)$dailyOvertime[$day] : 0;
+            $processed[$day] = isset($dailyOvertime[$day]) ? (float) $dailyOvertime[$day] : 0;
         }
         
         return $processed;
@@ -568,7 +741,7 @@ class PayrollController extends Controller
         $processed = [];
         
         foreach ($days as $day) {
-            $processed[$day] = isset($dailyLate[$day]) ? (float)$dailyLate[$day] : 0;
+            $processed[$day] = isset($dailyLate[$day]) ? (float) $dailyLate[$day] : 0;
         }
         
         return $processed;
@@ -583,47 +756,46 @@ class PayrollController extends Controller
         $processed = [];
         
         foreach ($days as $day) {
-            $processed[$day] = isset($dailySiteAddress[$day]) ? (string)$dailySiteAddress[$day] : '';
+            $processed[$day] = isset($dailySiteAddress[$day]) ? (string) $dailySiteAddress[$day] : '';
         }
         
         return $processed;
     }
 
     /**
-     * Calculate payroll with daily data
+     * Calculate payroll amounts with daily data
      */
-    private function calculatePayrollWithDaily($employee, $requestData, $dailyAttendance, $dailyOvertime, $dailyLate)
+    private function calculatePayrollWithDaily($employee, $data, $dailyAttendance, $dailyOvertime, $dailyLate)
     {
-        $dailyRate = (float)$employee->rate;
-        $hourlyRate = (float)$employee->hourly_rate;
+        $dailyRate = $employee->rate;
+        $hourlyRate = $employee->hourly_rate;
         
-        // Calculate working days from daily attendance
-        $workingDays = count(array_filter($dailyAttendance));
+        // Calculate from daily data if available, otherwise use totals
+        $workingDays = isset($data['working_days']) ? $data['working_days'] : array_sum(array_values($dailyAttendance));
+        $totalOvertimeHours = isset($data['overtime_hours']) ? $data['overtime_hours'] : array_sum(array_values($dailyOvertime));
+        $totalLateMinutes = isset($data['late_minutes']) ? $data['late_minutes'] : array_sum(array_values($dailyLate));
         
-        // Use input values for overtime and late instead of daily sums
-        $overtimeHours = (float)($requestData['overtime_hours'] ?? 0);
-        $lateMinutes = (float)($requestData['late_minutes'] ?? 0);
-        
-        // Basic salary calculation
-        $basicSalary = $workingDays * $dailyRate;
-        
-        // Overtime pay calculation - use input overtime_hours
-        $overtimePay = $overtimeHours * $hourlyRate;
-        
-        // Late deduction calculation - use input late_minutes
-        $lateDeduction = ($lateMinutes / 60) * $hourlyRate;
-        
-        // Gross pay
+        $cashAdvance = $data['cash_advance'];
+        $othersDeduction = $data['others_deduction'];
+
+        // Calculate basic salary (daily rate * working days)
+        $basicSalary = $dailyRate * $workingDays;
+
+        // Calculate overtime pay (hourly rate * 1.25 * overtime hours)
+        $overtimePay = $hourlyRate * 1.25 * $totalOvertimeHours;
+
+        // Calculate late deduction (hourly rate / 60 * late minutes)
+        $lateDeduction = ($hourlyRate / 60) * $totalLateMinutes;
+
+        // Calculate gross pay
         $grossPay = $basicSalary + $overtimePay;
-        
-        // Total deductions
-        $cashAdvance = (float)($requestData['cash_advance'] ?? 0);
-        $othersDeduction = (float)($requestData['others_deduction'] ?? 0);
+
+        // Calculate total deductions
         $totalDeductions = $lateDeduction + $cashAdvance + $othersDeduction;
-        
-        // Net pay
+
+        // Calculate net pay
         $netPay = $grossPay - $totalDeductions;
-        
+
         return [
             'basic_salary' => round($basicSalary, 2),
             'overtime_pay' => round($overtimePay, 2),

@@ -19,10 +19,12 @@ import {
   Building,
   HardHat,
   Grid3X3,
-  List
+  List,
+  Download
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Button } from '@/components/ui/button.jsx'
+import * as XLSX from 'xlsx'
 import API_BASE_URL from './Config'
 
 // Custom Dropdown Component
@@ -224,36 +226,217 @@ const DeleteConfirmationModal = React.memo(({ isOpen, onClose, onConfirm, record
   )
 })
 
-// Update Payroll Modal
+// Enhanced Update Payroll Modal - Now matches ProcessPayrollModal structure
 const UpdatePayrollModal = React.memo(({ isOpen, onClose, record, onUpdate, isUpdating }) => {
   const [formData, setFormData] = useState({
     status: '',
-    cash_advance: '',
-    others_deduction: ''
+    payPeriodStart: '',
+    payPeriodEnd: '',
+    // Site payroll fields
+    workingDays: {
+      monday: false,
+      tuesday: false,
+      wednesday: false,
+      thursday: false,
+      friday: false,
+      saturday: false
+    },
+    overtime: {
+      monday: '',
+      tuesday: '',
+      wednesday: '',
+      thursday: '',
+      friday: '',
+      saturday: ''
+    },
+    late: {
+      monday: '',
+      tuesday: '',
+      wednesday: '',
+      thursday: '',
+      friday: '',
+      saturday: ''
+    },
+    siteAddress: {
+      monday: '',
+      tuesday: '',
+      wednesday: '',
+      thursday: '',
+      friday: '',
+      saturday: ''
+    },
+    // Office payroll fields
+    totalWorkingDays: '',
+    totalLateMinutes: '',
+    totalOvertimeHours: '',
+    // Common fields
+    cashAdvance: '',
+    othersDeduction: ''
   })
 
   useEffect(() => {
     if (isOpen && record) {
+      // Determine if this is a site or office payroll based on available fields
+      const isSitePayroll = record.daily_attendance !== undefined
+      
+      // Parse daily attendance, overtime, late, and site address if available
+      let dailyAttendance = {}
+      let dailyOvertime = {}
+      let dailyLate = {}
+      let dailySiteAddress = {}
+      
+      if (isSitePayroll) {
+        try {
+          dailyAttendance = typeof record.daily_attendance === 'string' 
+            ? JSON.parse(record.daily_attendance) 
+            : record.daily_attendance || {}
+          dailyOvertime = typeof record.daily_overtime === 'string' 
+            ? JSON.parse(record.daily_overtime) 
+            : record.daily_overtime || {}
+          dailyLate = typeof record.daily_late === 'string' 
+            ? JSON.parse(record.daily_late) 
+            : record.daily_late || {}
+          dailySiteAddress = typeof record.daily_site_address === 'string' 
+            ? JSON.parse(record.daily_site_address) 
+            : record.daily_site_address || {}
+        } catch (e) {
+          console.error('Error parsing daily data:', e)
+        }
+      }
+
       setFormData({
         status: record.status || 'Pending',
-        cash_advance: record.cash_advance || '',
-        others_deduction: record.others_deduction || ''
+        payPeriodStart: record.pay_period_start || '',
+        payPeriodEnd: record.pay_period_end || '',
+        // Site payroll fields
+        workingDays: {
+          monday: dailyAttendance.monday || false,
+          tuesday: dailyAttendance.tuesday || false,
+          wednesday: dailyAttendance.wednesday || false,
+          thursday: dailyAttendance.thursday || false,
+          friday: dailyAttendance.friday || false,
+          saturday: dailyAttendance.saturday || false
+        },
+        overtime: {
+          monday: dailyOvertime.monday || '',
+          tuesday: dailyOvertime.tuesday || '',
+          wednesday: dailyOvertime.wednesday || '',
+          thursday: dailyOvertime.thursday || '',
+          friday: dailyOvertime.friday || '',
+          saturday: dailyOvertime.saturday || ''
+        },
+        late: {
+          monday: dailyLate.monday || '',
+          tuesday: dailyLate.tuesday || '',
+          wednesday: dailyLate.wednesday || '',
+          thursday: dailyLate.thursday || '',
+          friday: dailyLate.friday || '',
+          saturday: dailyLate.saturday || ''
+        },
+        siteAddress: {
+          monday: dailySiteAddress.monday || '',
+          tuesday: dailySiteAddress.tuesday || '',
+          wednesday: dailySiteAddress.wednesday || '',
+          thursday: dailySiteAddress.thursday || '',
+          friday: dailySiteAddress.friday || '',
+          saturday: dailySiteAddress.saturday || ''
+        },
+        // Office payroll fields
+        totalWorkingDays: record.total_working_days || record.working_days || '',
+        totalLateMinutes: record.total_late_minutes || record.late_minutes || '',
+        totalOvertimeHours: record.total_overtime_hours || record.overtime_hours || '',
+        // Common fields
+        cashAdvance: record.cash_advance || '',
+        othersDeduction: record.others_deduction || ''
       })
     }
   }, [isOpen, record])
 
   const handleInputChange = useCallback((field, value) => {
+    if (field.includes('.')) {
+      const [parent, child] = field.split('.')
+      setFormData(prev => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: value
+        }
+      }))
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }))
+    }
+  }, [])
+
+  const handleCheckboxChange = useCallback((day) => {
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      workingDays: {
+        ...prev.workingDays,
+        [day]: !prev.workingDays[day]
+      }
     }))
   }, [])
 
+  // Calculate totals for site payroll
+  const calculations = useMemo(() => {
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    const workingDaysCount = days.filter(day => formData.workingDays[day]).length
+    const totalOT = days.reduce((sum, day) => sum + (parseFloat(formData.overtime[day]) || 0), 0)
+    const totalLate = days.reduce((sum, day) => sum + (parseFloat(formData.late[day]) || 0), 0)
+    
+    return {
+      workingDaysCount,
+      totalOT: totalOT.toFixed(1),
+      totalLate: totalLate.toFixed(0)
+    }
+  }, [formData])
+
   const handleSubmit = useCallback(() => {
-    onUpdate(record.id, formData)
-  }, [record, formData, onUpdate])
+    // Determine if this is a site or office payroll
+    const isSitePayroll = record.daily_attendance !== undefined
+    
+    let updateData = {
+      status: formData.status,
+      pay_period_start: formData.payPeriodStart,
+      pay_period_end: formData.payPeriodEnd,
+      cash_advance: parseFloat(formData.cashAdvance) || 0,
+      others_deduction: parseFloat(formData.othersDeduction) || 0
+    }
+
+    if (isSitePayroll) {
+      // Site payroll update data
+      updateData = {
+        ...updateData,
+        working_days: calculations.workingDaysCount,
+        overtime_hours: parseFloat(calculations.totalOT),
+        late_minutes: parseFloat(calculations.totalLate),
+        daily_attendance: formData.workingDays,
+        daily_overtime: formData.overtime,
+        daily_late: formData.late,
+        daily_site_address: formData.siteAddress
+      }
+    } else {
+      // Office payroll update data
+      updateData = {
+        ...updateData,
+        total_working_days: parseInt(formData.totalWorkingDays) || 0,
+        total_late_minutes: parseFloat(formData.totalLateMinutes) || 0,
+        total_overtime_hours: parseFloat(formData.totalOvertimeHours) || 0
+      }
+    }
+
+    onUpdate(record.id, updateData)
+  }, [record, formData, calculations, onUpdate])
 
   if (!isOpen || !record) return null
+
+  // Determine if this is a site or office payroll
+  const isSitePayroll = record.daily_attendance !== undefined
+  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+  const dayLabels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
   return (
     <AnimatePresence>
@@ -268,73 +451,263 @@ const UpdatePayrollModal = React.memo(({ isOpen, onClose, record, onUpdate, isUp
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-white rounded-lg shadow-xl max-w-md w-full"
+          className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">
-                Update Payroll Record
+              <h2 className="text-2xl font-bold text-gray-900">
+                Update {isSitePayroll ? 'Site' : 'Office'} Payroll Record
               </h2>
               <Button variant="ghost" size="sm" onClick={onClose}>
                 <X className="h-5 w-5" />
               </Button>
             </div>
 
-            <div className="space-y-4">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-sm text-gray-600">Employee</p>
-                <p className="font-medium">{record.employee_name}</p>
-                <p className="text-xs text-gray-500">{record.employee_code} • {record.position}</p>
+            <div className="space-y-6">
+              {/* Employee Information */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Employee Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Employee Name</p>
+                    <p className="font-medium">{record.employee_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Employee Code</p>
+                    <p className="font-medium">{record.employee_code}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Position</p>
+                    <p className="font-medium">{record.position}</p>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => handleInputChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-                  disabled={isUpdating}
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Processing">Processing</option>
-                  <option value="Paid">Paid</option>
-                  <option value="On Hold">On Hold</option>
-                </select>
+              {/* Status and Pay Period */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => handleInputChange('status', e.target.value)}
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                      disabled={isUpdating}
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Processing">Processing</option>
+                      <option value="Paid">Paid</option>
+                      <option value="On Hold">On Hold</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Pay Period Start
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.payPeriodStart}
+                      onChange={(e) => handleInputChange('payPeriodStart', e.target.value)}
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                      disabled={isUpdating}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Pay Period End
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.payPeriodEnd}
+                      onChange={(e) => handleInputChange('payPeriodEnd', e.target.value)}
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                      disabled={isUpdating}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cash Advance
-                </label>
-                <input
-                  type="number"
-                  value={formData.cash_advance}
-                  onChange={(e) => handleInputChange('cash_advance', e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                  disabled={isUpdating}
-                />
-              </div>
+              {/* Attendance Section - Different for Site vs Office */}
+              {isSitePayroll ? (
+                // Site Payroll - Daily Attendance Grid
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Attendance</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">Day</th>
+                          <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">Present</th>
+                          <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">OT (hrs)</th>
+                          <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">Late (mins)</th>
+                          <th className="text-center py-2 px-3 text-sm font-medium text-gray-700">Site Address</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {days.map((day, index) => (
+                          <tr key={day} className="border-b border-gray-100">
+                            <td className="py-2 px-3 text-sm font-medium text-gray-900">
+                              {dayLabels[index]}
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={formData.workingDays[day]}
+                                onChange={() => handleCheckboxChange(day)}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                disabled={isUpdating}
+                              />
+                            </td>
+                            <td className="py-2 px-3">
+                              <input
+                                type="number"
+                                value={formData.overtime[day]}
+                                onChange={(e) => handleInputChange(`overtime.${day}`, e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                placeholder="0"
+                                min="0"
+                                step="0.5"
+                                disabled={isUpdating || !formData.workingDays[day]}
+                              />
+                            </td>
+                            <td className="py-2 px-3">
+                              <input
+                                type="number"
+                                value={formData.late[day]}
+                                onChange={(e) => handleInputChange(`late.${day}`, e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                placeholder="0"
+                                min="0"
+                                disabled={isUpdating || !formData.workingDays[day]}
+                              />
+                            </td>
+                            <td className="py-2 px-3">
+                              <input
+                                type="text"
+                                value={formData.siteAddress[day]}
+                                onChange={(e) => handleInputChange(`siteAddress.${day}`, e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                placeholder="Site address"
+                                disabled={isUpdating || !formData.workingDays[day]}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Others Deduction
-                </label>
-                <input
-                  type="number"
-                  value={formData.others_deduction}
-                  onChange={(e) => handleInputChange('others_deduction', e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                  disabled={isUpdating}
-                />
+                  {/* Summary Row */}
+                  <div className="mt-4 bg-blue-50 rounded-lg p-3">
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-xs text-gray-600">Working Days</p>
+                        <p className="text-lg font-semibold text-blue-600">{calculations.workingDaysCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600">Total OT</p>
+                        <p className="text-lg font-semibold text-green-600">{calculations.totalOT}h</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600">Total Late</p>
+                        <p className="text-lg font-semibold text-red-600">{calculations.totalLate} mins</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // Office Payroll - Total Input Fields
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Office Attendance Summary</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Total Working Days
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.totalWorkingDays}
+                        onChange={(e) => handleInputChange('totalWorkingDays', e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                        placeholder="0"
+                        min="0"
+                        max="31"
+                        disabled={isUpdating}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Total Late (minutes)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.totalLateMinutes}
+                        onChange={(e) => handleInputChange('totalLateMinutes', e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                        placeholder="0"
+                        min="0"
+                        step="0.01"
+                        disabled={isUpdating}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Total Overtime (hours)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.totalOvertimeHours}
+                        onChange={(e) => handleInputChange('totalOvertimeHours', e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                        placeholder="0"
+                        min="0"
+                        step="0.01"
+                        disabled={isUpdating}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Deductions Section */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Deductions</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cash Advance
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.cashAdvance}
+                      onChange={(e) => handleInputChange('cashAdvance', e.target.value)}
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                      disabled={isUpdating}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Others Deduction
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.othersDeduction}
+                      onChange={(e) => handleInputChange('othersDeduction', e.target.value)}
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                      disabled={isUpdating}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1093,16 +1466,16 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                             value={formData.emergencyCashAdvance}
                             onChange={(e) => handleInputChange('emergencyCashAdvance', e.target.value)}
                             className={`w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none ${
-                              ecaEdData?.has_active_eca ? 'bg-gray-100 cursor-not-allowed' : ''
+                              isEcaEdReadonly ? 'bg-gray-100 cursor-not-allowed' : ''
                             }`}
                             placeholder="0.00"
                             min="0"
                             step="0.01"
-                            disabled={isSubmitting || ecaEdData?.has_active_eca}
+                            disabled={isSubmitting || isEcaEdReadonly}
                           />
-                          {ecaEdData?.has_active_eca && (
+                          {isEcaEdReadonly && (
                             <p className="text-xs text-gray-500 mt-1">
-                              Employee already has active ECA
+                              Readonly - Employee has active ECA
                             </p>
                           )}
                         </div>
@@ -1116,43 +1489,34 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
                             value={formData.emergencyDeduction}
                             onChange={(e) => handleInputChange('emergencyDeduction', e.target.value)}
                             className={`w-full px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none ${
-                              ecaEdData?.has_active_ed ? 'bg-gray-100 cursor-not-allowed' : ''
+                              isEcaEdReadonly ? 'bg-gray-100 cursor-not-allowed' : ''
                             }`}
                             placeholder="0.00"
                             min="0"
                             step="0.01"
-                            disabled={isSubmitting || ecaEdData?.has_active_ed}
+                            disabled={isSubmitting || isEcaEdReadonly}
                           />
-                          {ecaEdData?.has_active_ed && (
+                          {isEcaEdReadonly && (
                             <p className="text-xs text-gray-500 mt-1">
-                              Employee already has active ED
+                              Readonly - Employee has active ECA
                             </p>
                           )}
                         </div>
                       </div>
-
-                      {(formData.emergencyCashAdvance && formData.emergencyDeduction) && (
-                        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                          <p className="text-sm text-blue-800">
-                            <AlertCircle className="h-4 w-4 inline mr-1" />
-                            Creating new Emergency Cash Advance and Emergency Deduction for this employee.
-                          </p>
-                        </div>
-                      )}
                     </div>
 
-                    {/* Submit Button */}
+                    {/* Action Buttons */}
                     <div className="flex justify-end space-x-3">
                       <Button
                         variant="outline"
-                        onClick={() => setStep(1)}
+                        onClick={onClose}
                         disabled={isSubmitting}
                       >
-                        Back
+                        Cancel
                       </Button>
                       <Button
                         onClick={handleSubmit}
-                        disabled={isSubmitting || !selectedEmployee || !formData.payPeriodStart || !formData.payPeriodEnd}
+                        disabled={isSubmitting || !formData.payPeriodStart || !formData.payPeriodEnd}
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                       >
                         {isSubmitting ? (
@@ -1180,15 +1544,16 @@ const ProcessPayrollModal = React.memo(({ isOpen, onClose, onSubmit, isSubmittin
 })
 
 // Main WorkersPayroll Component
-const WorkersPayroll = () => {
+export default function WorkersPayroll() {
+  // State management
   const [payrollRecords, setPayrollRecords] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
   const [departmentFilter, setDepartmentFilter] = useState('all')
   const [groupFilter, setGroupFilter] = useState('all')
   const [viewMode, setViewMode] = useState('card')
+  const [isExporting, setIsExporting] = useState(false)
   
   // Modal states
   const [showProcessModal, setShowProcessModal] = useState(false)
@@ -1256,6 +1621,159 @@ const WorkersPayroll = () => {
   useEffect(() => {
     fetchPayrollRecords()
   }, [fetchPayrollRecords])
+
+  // Excel Export Function
+  const handleExportToExcel = useCallback(async () => {
+    try {
+      setIsExporting(true)
+      
+      // Filter only site employees for export
+      const siteRecords = payrollRecords.filter(record => record.payroll_type === 'Site')
+      
+      if (siteRecords.length === 0) {
+        setError('No site payroll records found to export')
+        return
+      }
+      
+      // Group records by employee group
+      const groupedRecords = siteRecords.reduce((groups, record) => {
+        const group = record.employee_group || 'No Group'
+        if (!groups[group]) {
+          groups[group] = []
+        }
+        groups[group].push(record)
+        return groups
+      }, {})
+      
+      // Create workbook
+      const wb = XLSX.utils.book_new()
+      
+      // Process each group
+      Object.keys(groupedRecords).forEach(groupName => {
+        const groupRecords = groupedRecords[groupName]
+        
+        // Prepare data for this group
+        const exportData = []
+        
+        // Add group header
+        exportData.push([`GROUP: ${groupName}`])
+        exportData.push([]) // Empty row
+        
+        // Add column headers
+        exportData.push([
+          'Name',
+          'Group',
+          'Rate',
+          'Monday',
+          'Tuesday', 
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday',
+          'Working Days',
+          'OT Pay',
+          'Late',
+          'CA',
+          'Total Salary'
+        ])
+        
+        let groupTotalSalary = 0
+        
+        // Add employee data
+        groupRecords.forEach(record => {
+          // Parse daily attendance data
+          let dailyAttendance = {}
+          try {
+            dailyAttendance = typeof record.daily_attendance === 'string' 
+              ? JSON.parse(record.daily_attendance) 
+              : record.daily_attendance || {}
+          } catch (e) {
+            console.error('Error parsing daily attendance:', e)
+          }
+          
+          const totalSalary = parseFloat(record.net_pay || 0)
+          groupTotalSalary += totalSalary
+          
+          exportData.push([
+            record.employee_name || '',
+            record.employee_group || '',
+            parseFloat(record.daily_rate || 0).toFixed(2),
+            dailyAttendance.monday ? 'Present' : 'Absent',
+            dailyAttendance.tuesday ? 'Present' : 'Absent',
+            dailyAttendance.wednesday ? 'Present' : 'Absent',
+            dailyAttendance.thursday ? 'Present' : 'Absent',
+            dailyAttendance.friday ? 'Present' : 'Absent',
+            dailyAttendance.saturday ? 'Present' : 'Absent',
+            record.working_days || 0,
+            parseFloat(record.overtime_pay || 0).toFixed(2),
+            parseFloat(record.late_deduction || 0).toFixed(2),
+            parseFloat(record.cash_advance || 0).toFixed(2),
+            totalSalary.toFixed(2)
+          ])
+        })
+        
+        // Add group total
+        exportData.push([]) // Empty row
+        exportData.push([
+          'GROUP TOTAL',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          groupTotalSalary.toFixed(2)
+        ])
+        exportData.push([]) // Empty row for separation
+        
+        // Create worksheet for this group
+        const ws = XLSX.utils.aoa_to_sheet(exportData)
+        
+        // Set column widths
+        ws['!cols'] = [
+          { width: 20 }, // Name
+          { width: 15 }, // Group
+          { width: 10 }, // Rate
+          { width: 12 }, // Monday
+          { width: 12 }, // Tuesday
+          { width: 12 }, // Wednesday
+          { width: 12 }, // Thursday
+          { width: 12 }, // Friday
+          { width: 12 }, // Saturday
+          { width: 12 }, // Working Days
+          { width: 10 }, // OT Pay
+          { width: 10 }, // Late
+          { width: 10 }, // CA
+          { width: 12 }  // Total Salary
+        ]
+        
+        // Add worksheet to workbook
+        XLSX.utils.book_append_sheet(wb, ws, groupName.substring(0, 31)) // Excel sheet name limit
+      })
+      
+      // Generate filename with current date
+      const currentDate = new Date().toISOString().split('T')[0]
+      const filename = `Site_Payroll_Export_${currentDate}.xlsx`
+      
+      // Save file
+      XLSX.writeFile(wb, filename)
+      
+      setSuccessMessage('Payroll data exported successfully!')
+      setShowSuccessAlert(true)
+      
+    } catch (error) {
+      console.error('Error exporting to Excel:', error)
+      setError('Failed to export payroll data')
+    } finally {
+      setIsExporting(false)
+    }
+  }, [payrollRecords])
 
   // Handle payroll submission
   const handlePayrollSubmit = useCallback(async (data, endpoint) => {
@@ -1365,13 +1883,12 @@ const WorkersPayroll = () => {
            (record.pay_period_end || '').toLowerCase().includes(lowercasedSearchTerm)
       );
       
-      const matchesStatus = statusFilter === 'all' || record.status === statusFilter;
       const matchesDepartment = departmentFilter === 'all' || record.payroll_type === departmentFilter;
       const matchesGroup = groupFilter === 'all' || record.employee_group === groupFilter;
       
-      return matchesSearch && matchesStatus && matchesDepartment && matchesGroup;
+      return matchesSearch && matchesDepartment && matchesGroup;
     });
-  }, [payrollRecords, searchTerm, statusFilter, departmentFilter, groupFilter]);
+  }, [payrollRecords, searchTerm, departmentFilter, groupFilter]);
 
   const summaryStats = useMemo(() => {
     const totalRecords = filteredRecords.length;
@@ -1388,15 +1905,6 @@ const WorkersPayroll = () => {
   }, [filteredRecords]);
 
   const groups = [...new Set(payrollRecords.map(record => record.employee_group).filter(Boolean))]
-
-  // Status options for dropdown
-  const statusOptions = [
-    { value: 'all', label: 'All Status' },
-    { value: 'Pending', label: 'Pending' },
-    { value: 'Processing', label: 'Processing' },
-    { value: 'Paid', label: 'Paid' },
-    { value: 'On Hold', label: 'On Hold' }
-  ]
 
   // Department options for dropdown
   const departmentOptions = [
@@ -1537,7 +2045,7 @@ const WorkersPayroll = () => {
   }
 
   return (
-    <div className="min-h-screen  p-6">
+    <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <motion.div
@@ -1653,53 +2161,58 @@ const WorkersPayroll = () => {
   transition={{ duration: 0.5, delay: 0.3 }}
   className="bg-white rounded-lg shadow-md p-6"
 >
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-    {/* Search Field */}
-    <div className="lg:col-span-2 flex flex-col">
-      <label className="text-sm font-medium mb-1">Search</label>
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-        <input
-          type="text"
-          placeholder="Search employees, codes, positions..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
-        />
-      </div>
-    </div>
-
-    {/* Status */}
-    <div className="flex flex-col">
-      <label className="text-sm font-medium mb-1">Status</label>
-      <CustomDropdown
-        value={statusFilter}
-        onChange={setStatusFilter}
-        options={statusOptions}
-        placeholder="All Status"
+  <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+    {/* Search bar (takes 3 columns on md+) */}
+    <div className="relative md:col-span-3">
+      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+      <input
+        type="text"
+        placeholder="Search employees..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
       />
     </div>
 
-    {/* Department */}
-    <div className="flex flex-col">
-      <label className="text-sm font-medium mb-1">Department</label>
+    {/* Department filter (1 column) */}
+    <div className="md:col-span-1">
       <CustomDropdown
         value={departmentFilter}
         onChange={setDepartmentFilter}
         options={departmentOptions}
-        placeholder="All Departments"
+        placeholder="Filter by department"
       />
     </div>
 
-    {/* Group */}
-    <div className="flex flex-col">
-      <label className="text-sm font-medium mb-1">Group</label>
+    {/* Group filter (1 column) */}
+    <div className="md:col-span-1">
       <CustomDropdown
         value={groupFilter}
         onChange={setGroupFilter}
         options={groupOptions}
-        placeholder="All Groups"
+        placeholder="Filter by group"
       />
+    </div>
+
+    {/* Export button (1 column, same as filters) */}
+    <div className="md:col-span-1">
+      <Button
+        onClick={handleExportToExcel}
+        disabled={isExporting}
+        className="w-full bg-green-600 hover:bg-green-700 text-white"
+      >
+        {isExporting ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            Exporting...
+          </>
+        ) : (
+          <>
+            <Download className="h-4 w-4 mr-2" />
+            Export Excel
+          </>
+        )}
+      </Button>
     </div>
   </div>
 </motion.div>
@@ -1714,82 +2227,96 @@ const WorkersPayroll = () => {
                 key={record.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
                 whileHover={{ scale: 1.02 }}
               >
                 <Card className="bg-white border-gray-200 hover:border-blue-500 transition-colors shadow-md">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className={`p-2 rounded-lg ${record.payroll_type === 'Site' ? 'bg-orange-100' : 'bg-blue-100'}`}>
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center">
+                        <div className={`p-2 rounded-lg mr-3 ${record.payroll_type === 'Site' ? 'bg-orange-100' : 'bg-blue-100'}`}>
                           {record.payroll_type === 'Site' ? (
-                            <HardHat className={`h-4 w-4 ${record.payroll_type === 'Site' ? 'text-orange-600' : 'text-blue-600'}`} />
+                            <HardHat className={`h-5 w-5 ${record.payroll_type === 'Site' ? 'text-orange-600' : 'text-blue-600'}`} />
                           ) : (
-                            <Building className={`h-4 w-4 ${record.payroll_type === 'Site' ? 'text-orange-600' : 'text-blue-600'}`} />
+                            <Building className={`h-5 w-5 ${record.payroll_type === 'Site' ? 'text-orange-600' : 'text-blue-600'}`} />
                           )}
                         </div>
                         <div>
-                          <CardTitle className="text-lg">{record.employee_name}</CardTitle>
+                          <h3 className="font-semibold text-gray-900">{record.employee_name}</h3>
                           <p className="text-sm text-gray-600">{record.employee_code} • {record.position}</p>
                         </div>
                       </div>
                       <StatusBadge status={record.status} />
                     </div>
-                  </CardHeader>
-                  <CardContent>
+
                     <div className="space-y-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Pay Period:</span>
-                        <span className="font-medium">{record.pay_period_start} to {record.pay_period_end}</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Department:</span>
+                        <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                          record.payroll_type === 'Site' 
+                            ? 'bg-orange-100 text-orange-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {record.payroll_type}
+                        </span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Department:</span>
-                        <span className="font-medium">{record.payroll_type}</span>
+                      
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Pay Period:</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {record.pay_period_start} to {record.pay_period_end}
+                        </span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Group:</span>
-                        <span className="font-medium">{record.employee_group}</span>
+                      
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Working Days:</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {record.payroll_type === 'Site' ? record.working_days : record.total_working_days}
+                        </span>
                       </div>
-                      {record.payroll_type === 'Site' ? (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Working Days:</span>
-                          <span className="font-medium">{record.working_days}</span>
-                        </div>
-                      ) : (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Working Days:</span>
-                          <span className="font-medium">{record.total_working_days}</span>
-                        </div>
-                      )}
-                      <div className="border-t pt-3">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600">Gross Pay:</span>
-                          <span className="font-medium text-green-600">₱{parseFloat(record.gross_pay).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600">Overtime Pay:</span>
-                          <span className="font-medium text-green-600">₱{parseFloat(record.overtime_pay).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600">Cash Advance:</span>
-                          <span className="font-medium text-red-600">₱{parseFloat(record.cash_advance).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600">Late:</span>
-                          <span className="font-medium text-red-600">₱{parseFloat(record.late_deduction).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600">Deductions:</span>
-                          <span className="font-medium text-red-600">₱{parseFloat(record.total_deductions).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-lg font-bold">
-                          <span>Net Pay:</span>
-                          <span className="text-blue-600">₱{parseFloat(record.net_pay).toFixed(2)}</span>
-                        </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Overtime Pay:</span>
+                        <span className="text-sm font-medium text-green-600">
+                          + ₱{parseFloat(record.overtime_pay).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Late Deduction:</span>
+                        <span className="text-sm font-medium text-red-600">
+                          - ₱{parseFloat(record.late_deduction).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Cash Adavance:</span>
+                        <span className="text-sm font-medium text-red-600">
+                          - ₱{parseFloat(record.cash_advance).toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Other Deduction:</span>
+                        <span className="text-sm font-medium text-red-600">
+                          - ₱{parseFloat(record.others_deduction).toFixed(2)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Gross Pay:</span>
+                        <span className="text-sm font-medium text-green-600">
+                          ₱{parseFloat(record.gross_pay).toFixed(2)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Net Pay:</span>
+                        <span className="text-sm font-bold text-blue-600">
+                          ₱{parseFloat(record.net_pay).toFixed(2)}
+                        </span>
                       </div>
                     </div>
-                    
-                    <div className="flex justify-end space-x-2 mt-4">
+
+                    <div className="flex space-x-2 mt-4">
                       <Button
                         variant="outline"
                         size="sm"
@@ -1797,6 +2324,7 @@ const WorkersPayroll = () => {
                           setSelectedRecord(record)
                           setShowUpdateModal(true)
                         }}
+                        className="flex-1 text-blue-600 hover:text-white hover:bg-blue-600"
                       >
                         <Edit className="h-4 w-4 mr-1" />
                       </Button>
@@ -1980,7 +2508,7 @@ const WorkersPayroll = () => {
             <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No payroll records found</h3>
             <p className="text-gray-600 mb-4">
-              {searchTerm || statusFilter !== 'all' || departmentFilter !== 'all' || groupFilter !== 'all'
+              {searchTerm || departmentFilter !== 'all' || groupFilter !== 'all'
                 ? 'Try adjusting your search or filters'
                 : 'Start by processing your first payroll'}
             </p>
@@ -2029,4 +2557,3 @@ const WorkersPayroll = () => {
   )
 }
 
-export default WorkersPayroll

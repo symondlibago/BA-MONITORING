@@ -236,12 +236,17 @@ class OfficePayrollController extends Controller
     }
 
     /**
-     * Update an office payroll record
+     * Update an office payroll record - Enhanced to support all fields
      */
     public function update(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
             'status' => 'nullable|in:Pending,Processing,Paid,On Hold',
+            'pay_period_start' => 'nullable|date',
+            'pay_period_end' => 'nullable|date|after_or_equal:pay_period_start',
+            'total_working_days' => 'nullable|integer|min:0|max:31',
+            'total_late_minutes' => 'nullable|numeric|min:0',
+            'total_overtime_hours' => 'nullable|numeric|min:0',
             'cash_advance' => 'nullable|numeric|min:0',
             'others_deduction' => 'nullable|numeric|min:0'
         ]);
@@ -255,6 +260,8 @@ class OfficePayrollController extends Controller
         }
 
         try {
+            DB::beginTransaction();
+
             $officePayroll = DB::table('office_payrolls')->where('id', $id)->first();
 
             if (!$officePayroll) {
@@ -264,36 +271,142 @@ class OfficePayrollController extends Controller
                 ], 404);
             }
 
+            // Get employee details for recalculation
+            $employee = DB::table('employees')->where('id', $officePayroll->employee_id)->first();
+
+            if (!$employee) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found'
+                ], 404);
+            }
+
             // Prepare update data
             $updateData = ['updated_at' => now()];
             
+            // Update basic fields
             if ($request->has('status')) {
                 $updateData['status'] = $request->status;
             }
             
+            if ($request->has('pay_period_start')) {
+                $updateData['pay_period_start'] = $request->pay_period_start;
+            }
+            
+            if ($request->has('pay_period_end')) {
+                $updateData['pay_period_end'] = $request->pay_period_end;
+            }
+
+            // Check if any calculation-affecting fields are being updated
+            $needsRecalculation = false;
+            $calculationData = [
+                'total_working_days' => $officePayroll->total_working_days,
+                'total_late_minutes' => $officePayroll->total_late_minutes,
+                'total_overtime_hours' => $officePayroll->total_overtime_hours,
+                'cash_advance' => $officePayroll->cash_advance,
+                'others_deduction' => $officePayroll->others_deduction
+            ];
+
+            if ($request->has('total_working_days')) {
+                $updateData['total_working_days'] = $request->total_working_days;
+                $calculationData['total_working_days'] = $request->total_working_days;
+                $needsRecalculation = true;
+            }
+            
+            if ($request->has('total_late_minutes')) {
+                $updateData['total_late_minutes'] = $request->total_late_minutes;
+                $calculationData['total_late_minutes'] = $request->total_late_minutes;
+                $needsRecalculation = true;
+            }
+            
+            if ($request->has('total_overtime_hours')) {
+                $updateData['total_overtime_hours'] = $request->total_overtime_hours;
+                $calculationData['total_overtime_hours'] = $request->total_overtime_hours;
+                $needsRecalculation = true;
+            }
+            
             if ($request->has('cash_advance')) {
                 $updateData['cash_advance'] = $request->cash_advance;
+                $calculationData['cash_advance'] = $request->cash_advance;
+                $needsRecalculation = true;
             }
             
             if ($request->has('others_deduction')) {
                 $updateData['others_deduction'] = $request->others_deduction;
+                $calculationData['others_deduction'] = $request->others_deduction;
+                $needsRecalculation = true;
             }
 
-            // Recalculate totals if deductions changed
-            if ($request->has('cash_advance') || $request->has('others_deduction')) {
-                $cashAdvance = $request->has('cash_advance') ? $request->cash_advance : $officePayroll->cash_advance;
-                $othersDeduction = $request->has('others_deduction') ? $request->others_deduction : $officePayroll->others_deduction;
+            // Recalculate if necessary
+            if ($needsRecalculation) {
+                $calculations = $this->calculateOfficePayroll($employee, $calculationData);
                 
-                $totalDeductions = $officePayroll->late_deduction + $cashAdvance + $othersDeduction;
-                $netPay = $officePayroll->gross_pay - $totalDeductions;
-                
-                $updateData['total_deductions'] = $totalDeductions;
-                $updateData['net_pay'] = $netPay;
+                $updateData['basic_salary'] = $calculations['basic_salary'];
+                $updateData['overtime_pay'] = $calculations['overtime_pay'];
+                $updateData['late_deduction'] = $calculations['late_deduction'];
+                $updateData['gross_pay'] = $calculations['gross_pay'];
+                $updateData['total_deductions'] = $calculations['total_deductions'];
+                $updateData['net_pay'] = $calculations['net_pay'];
+            }
+
+            // Handle ECA deduction updates if cash advance changed
+            if ($request->has('cash_advance')) {
+                $existingEca = DB::table('emergency_cash_advances')
+                    ->where('employee_id', $officePayroll->employee_id)
+                    ->where('status', 'active')
+                    ->first();
+
+                $existingEd = DB::table('emergency_deductions')
+                    ->where('employee_id', $officePayroll->employee_id)
+                    ->where('status', 'active')
+                    ->first();
+
+                if ($existingEca && $existingEd) {
+                    // Calculate the difference in cash advance
+                    $oldCashAdvance = $officePayroll->cash_advance;
+                    $newCashAdvance = $request->cash_advance;
+                    $difference = $newCashAdvance - $oldCashAdvance;
+
+                    if ($difference != 0) {
+                        $newBalance = $existingEca->remaining_balance - $difference;
+                        
+                        if ($newBalance <= 0) {
+                            // Mark ECA and ED as completed
+                            DB::table('emergency_cash_advances')
+                                ->where('employee_id', $officePayroll->employee_id)
+                                ->where('status', 'active')
+                                ->update([
+                                    'status' => 'completed',
+                                    'remaining_balance' => 0,
+                                    'updated_at' => now()
+                                ]);
+
+                            DB::table('emergency_deductions')
+                                ->where('employee_id', $officePayroll->employee_id)
+                                ->where('status', 'active')
+                                ->update([
+                                    'status' => 'completed',
+                                    'updated_at' => now()
+                                ]);
+                        } else {
+                            // Update remaining balance
+                            DB::table('emergency_cash_advances')
+                                ->where('employee_id', $officePayroll->employee_id)
+                                ->where('status', 'active')
+                                ->update([
+                                    'remaining_balance' => max(0, $newBalance),
+                                    'updated_at' => now()
+                                ]);
+                        }
+                    }
+                }
             }
 
             DB::table('office_payrolls')->where('id', $id)->update($updateData);
 
             $updatedOfficePayroll = DB::table('office_payrolls')->where('id', $id)->first();
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
@@ -301,6 +414,7 @@ class OfficePayrollController extends Controller
                 'data' => $updatedOfficePayroll
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update office payroll record',

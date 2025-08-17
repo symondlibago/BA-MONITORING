@@ -32,6 +32,32 @@ import API_BASE_URL from './Config'
 // Status options for vehicles
 const statusOptions = ['All', 'Pending', 'Complete']
 
+
+const formatDateForInput = (dateString) => {
+  if (!dateString) return ''
+  
+  // If it's already in YYYY-MM-DD format, return as is
+  if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return dateString
+  }
+  
+  // Try to parse and format the date
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return ''
+    
+    // Format as YYYY-MM-DD for HTML date input
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    
+    return `${year}-${month}-${day}`
+  } catch (error) {
+    console.error('Error formatting date:', error)
+    return ''
+  }
+}
+
 // Success Alert Component
 function SuccessAlert({ isVisible, message, onClose }) {
   useEffect(() => {
@@ -465,11 +491,11 @@ function VehicleModal({ isOpen, onClose, onSubmit, initialData }) {
 
   useEffect(() => {
     if (initialData) {
-      // Pre-fill form with existing data
+      // Pre-fill form with existing data - FIXED: Properly format dates for HTML date inputs
       setFormData({
         vehicle_name: initialData.vehicle_name || '',
-        lto_renewal_date: initialData.lto_renewal_date || '',
-        maintenance_date: initialData.maintenance_date || '',
+        lto_renewal_date: formatDateForInput(initialData.lto_renewal_date),
+        maintenance_date: formatDateForInput(initialData.maintenance_date),
         description: initialData.description || '',
         status: initialData.status || 'pending',
         images: initialData.images || []
