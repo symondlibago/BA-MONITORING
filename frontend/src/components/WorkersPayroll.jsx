@@ -1622,6 +1622,127 @@ export default function WorkersPayroll() {
     fetchPayrollRecords()
   }, [fetchPayrollRecords])
 
+
+  // Individual export
+  const handleIndividualExport = useCallback(async (record) => {
+    try {
+      const wb = XLSX.utils.book_new()
+      const exportData = []
+  
+      if (record.payroll_type === 'Site') {
+        // SITE EMPLOYEE EXPORT
+        exportData.push([`Payroll Details - ${record.employee_name}`])
+        exportData.push([])
+  
+        // Headers
+        exportData.push([
+          'Name',
+          'Group',
+          'Rate',
+          'Monday',
+          'Tuesday',
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday',
+          'Working Days',
+          'OT Pay',
+          'Late',
+          'CA',
+          'Total Salary'
+        ])
+  
+        // Parse daily attendance
+        let dailyAttendance = {}
+        try {
+          dailyAttendance = typeof record.daily_attendance === 'string'
+            ? JSON.parse(record.daily_attendance)
+            : record.daily_attendance || {}
+        } catch (e) {
+          console.error('Error parsing daily attendance:', e)
+        }
+  
+        exportData.push([
+          record.employee_name || '',
+          record.employee_group || '',
+          parseFloat(record.daily_rate || 0).toFixed(2),
+          dailyAttendance.monday ? 'Present' : 'Absent',
+          dailyAttendance.tuesday ? 'Present' : 'Absent',
+          dailyAttendance.wednesday ? 'Present' : 'Absent',
+          dailyAttendance.thursday ? 'Present' : 'Absent',
+          dailyAttendance.friday ? 'Present' : 'Absent',
+          dailyAttendance.saturday ? 'Present' : 'Absent',
+          record.working_days || 0,
+          parseFloat(record.overtime_pay || 0).toFixed(2),
+          parseFloat(record.late_deduction || 0).toFixed(2),
+          parseFloat(record.cash_advance || 0).toFixed(2),
+          parseFloat(record.net_pay || 0).toFixed(2)
+        ])
+      } else {
+        // OFFICE EMPLOYEE EXPORT
+        exportData.push([`Payroll Details - ${record.employee_name}`])
+        exportData.push([])
+  
+        exportData.push([
+          'Name',
+          'Group',
+          'Position',
+          'Working Days',
+          'OT Hours',
+          'Late (mins)',
+          'Basic Pay',
+          'OT Pay',
+          'Gross Pay',
+          'Late Deduction',
+          'Cash Advance',
+          'Other Deductions',
+          'Total Deductions',
+          'Net Pay'
+        ])
+  
+        exportData.push([
+          record.employee_name || '',
+          record.employee_group || '',
+          record.position || '',
+          record.total_working_days || 0,
+          parseFloat(record.total_overtime_hours || 0).toFixed(1),
+          parseFloat(record.total_late_minutes || 0).toFixed(0),
+          parseFloat(record.basic_pay || 0).toFixed(2),
+          parseFloat(record.overtime_pay || 0).toFixed(2),
+          parseFloat(record.gross_pay || 0).toFixed(2),
+          parseFloat(record.late_deduction || 0).toFixed(2),
+          parseFloat(record.cash_advance || 0).toFixed(2),
+          parseFloat(record.others_deduction || 0).toFixed(2),
+          parseFloat(record.total_deductions || 0).toFixed(2),
+          parseFloat(record.net_pay || 0).toFixed(2)
+        ])
+      }
+  
+      // Create worksheet
+      const ws = XLSX.utils.aoa_to_sheet(exportData)
+  
+      // Auto column width
+      ws['!cols'] = Array(exportData[0].length).fill({ width: 15 })
+  
+      // Add to workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Payroll Details')
+  
+      // File name
+      const currentDate = new Date().toISOString().split('T')[0]
+      const employeeName = record.employee_name.replace(/[^a-zA-Z0-9]/g, '_')
+      const filename = `${employeeName}_Payroll_${currentDate}.xlsx`
+  
+      XLSX.writeFile(wb, filename)
+  
+      setSuccessMessage(`Payroll data for ${record.employee_name} exported successfully!`)
+      setShowSuccessAlert(true)
+    } catch (error) {
+      console.error('Error exporting individual payroll:', error)
+      setError('Failed to export individual payroll data')
+    }
+  }, [])
+  
+
   // Excel Export Function
   const handleExportToExcel = useCallback(async () => {
     try {
@@ -2320,6 +2441,14 @@ export default function WorkersPayroll() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => handleIndividualExport(record)}
+                        className="flex-1 text-green-600 hover:text-white hover:bg-green-600"
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                           setSelectedRecord(record)
                           setShowUpdateModal(true)
@@ -2466,7 +2595,15 @@ export default function WorkersPayroll() {
                         <StatusBadge status={record.status} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
+                      <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleIndividualExport(record)}
+                            className="text-green-600 hover:text-green-700 hover:border-green-300"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
