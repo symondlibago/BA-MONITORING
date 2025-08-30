@@ -23,24 +23,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.j
 import { Button } from '@/components/ui/button.jsx'
 import API_BASE_URL from './Config'
 import { jsPDF } from 'jspdf'
+import logo from '../assets/pdflogo.png';
 
 
 const addLogo = async (doc) => {
-    try {
-      const response = await fetch(`${window.location.origin}/pdflogo.png`);
-      const blob = await response.blob();
-  
-      const reader = new FileReader();
-      return new Promise((resolve) => {
-        reader.onloadend = () => {
-          doc.addImage(reader.result, "PNG", 240, 30, 150, 60);
-          resolve();
-        };
-        reader.readAsDataURL(blob);
-      });
-    } catch (err) {
-      console.error("Logo failed to load:", err);
-    }
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = logo; 
+      img.onload = () => {
+        doc.addImage(img, "PNG", 240, 30, 150, 60); 
+        resolve();
+      };
+    });
   };
   
   
@@ -51,8 +45,8 @@ const addLogo = async (doc) => {
       format: "letter",
     });
   
-    // ✅ Wait for logo before drawing content
     await addLogo(doc);
+    generatePdfContent();
 
     function generatePdfContent() {
       doc.setFontSize(10)
