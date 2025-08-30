@@ -27,13 +27,13 @@ import { jsPDF } from 'jspdf'
 
 const addLogo = async (doc) => {
     try {
-      const response = await fetch("/pdflogo.png"); // file in public/
+      const response = await fetch(`${window.location.origin}/pdflogo.png`);
       const blob = await response.blob();
   
       const reader = new FileReader();
       return new Promise((resolve) => {
         reader.onloadend = () => {
-          doc.addImage(reader.result, "PNG", 240, 30, 150, 60); // position + size
+          doc.addImage(reader.result, "PNG", 240, 30, 150, 60);
           resolve();
         };
         reader.readAsDataURL(blob);
@@ -42,6 +42,7 @@ const addLogo = async (doc) => {
       console.error("Logo failed to load:", err);
     }
   };
+  
   
   const exportToPdf = async (material) => {
     const doc = new jsPDF({
