@@ -16,6 +16,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\DailyUpdateController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\RFIQueryController;
+use App\Http\Controllers\MaterialController;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,7 +43,6 @@ Route::post("/login", [AuthController::class, "login"]);
 Route::apiResource("expenses", ExpenseController::class);
 Route::get('/expenses/{id}/image/{imageIndex}', [ExpenseController::class, 'getImage']);
 
-
 // Vehicle routes (public for now, can be protected later)
 Route::apiResource("vehicles", VehicleController::class);
 Route::patch("vehicles/{id}/status", [VehicleController::class, "updateStatus"]);
@@ -65,6 +65,14 @@ Route::apiResource("projects", ProjectController::class);
 // Daily Update routes (public for now, can be protected later)
 Route::apiResource("daily-updates", DailyUpdateController::class);
 Route::get("projects/{projectId}/daily-updates", [DailyUpdateController::class, "index"]);
+
+// Materials routes (public for now, can be protected later)
+Route::apiResource("materials", MaterialController::class);
+Route::patch("materials/{id}/status", [MaterialController::class, "updateStatus"]);
+Route::get("materials/status/{status}", [MaterialController::class, "getByStatus"]);
+Route::get("materials/search", [MaterialController::class, "search"]);
+Route::get("materials/statistics", [MaterialController::class, "getStatistics"]);
+Route::patch("materials/bulk-status", [MaterialController::class, "bulkUpdateStatus"]);
 
 // Protected routes
 Route::middleware("auth:sanctum")->group(function () {
@@ -107,7 +115,5 @@ Route::middleware("api")->group(function () {
     Route::patch("rfi-queries/{id}/status", [RFIQueryController::class, "updateStatus"]);
     Route::get("rfi-queries/status/{status}", [RFIQueryController::class, "getByStatus"]);
     Route::get("rfi-queries/search", [RFIQueryController::class, "search"]);
-
-    
 });
 

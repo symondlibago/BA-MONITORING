@@ -782,7 +782,7 @@ class PayrollController extends Controller
         $basicSalary = $dailyRate * $workingDays;
 
         // Calculate overtime pay (hourly rate * 1.25 * overtime hours)
-        $overtimePay = $hourlyRate * 1.25 * $totalOvertimeHours;
+        $overtimePay = $hourlyRate * 1 * $totalOvertimeHours;
 
         // Calculate late deduction (hourly rate / 60 * late minutes)
         $lateDeduction = ($hourlyRate / 60) * $totalLateMinutes;

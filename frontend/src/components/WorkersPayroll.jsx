@@ -1743,159 +1743,6 @@ export default function WorkersPayroll() {
   }, [])
   
 
-  // Excel Export Function
-  const handleExportToExcel = useCallback(async () => {
-    try {
-      setIsExporting(true)
-      
-      // Filter only site employees for export
-      const siteRecords = payrollRecords.filter(record => record.payroll_type === 'Site')
-      
-      if (siteRecords.length === 0) {
-        setError('No site payroll records found to export')
-        return
-      }
-      
-      // Group records by employee group
-      const groupedRecords = siteRecords.reduce((groups, record) => {
-        const group = record.employee_group || 'No Group'
-        if (!groups[group]) {
-          groups[group] = []
-        }
-        groups[group].push(record)
-        return groups
-      }, {})
-      
-      // Create workbook
-      const wb = XLSX.utils.book_new()
-      
-      // Process each group
-      Object.keys(groupedRecords).forEach(groupName => {
-        const groupRecords = groupedRecords[groupName]
-        
-        // Prepare data for this group
-        const exportData = []
-        
-        // Add group header
-        exportData.push([`GROUP: ${groupName}`])
-        exportData.push([]) // Empty row
-        
-        // Add column headers
-        exportData.push([
-          'Name',
-          'Group',
-          'Rate',
-          'Monday',
-          'Tuesday', 
-          'Wednesday',
-          'Thursday',
-          'Friday',
-          'Saturday',
-          'Working Days',
-          'OT Pay',
-          'Late',
-          'CA',
-          'Total Salary'
-        ])
-        
-        let groupTotalSalary = 0
-        
-        // Add employee data
-        groupRecords.forEach(record => {
-          // Parse daily attendance data
-          let dailyAttendance = {}
-          try {
-            dailyAttendance = typeof record.daily_attendance === 'string' 
-              ? JSON.parse(record.daily_attendance) 
-              : record.daily_attendance || {}
-          } catch (e) {
-            console.error('Error parsing daily attendance:', e)
-          }
-          
-          const totalSalary = parseFloat(record.net_pay || 0)
-          groupTotalSalary += totalSalary
-          
-          exportData.push([
-            record.employee_name || '',
-            record.employee_group || '',
-            parseFloat(record.daily_rate || 0).toFixed(2),
-            dailyAttendance.monday ? 'Present' : 'Absent',
-            dailyAttendance.tuesday ? 'Present' : 'Absent',
-            dailyAttendance.wednesday ? 'Present' : 'Absent',
-            dailyAttendance.thursday ? 'Present' : 'Absent',
-            dailyAttendance.friday ? 'Present' : 'Absent',
-            dailyAttendance.saturday ? 'Present' : 'Absent',
-            record.working_days || 0,
-            parseFloat(record.overtime_pay || 0).toFixed(2),
-            parseFloat(record.late_deduction || 0).toFixed(2),
-            parseFloat(record.cash_advance || 0).toFixed(2),
-            totalSalary.toFixed(2)
-          ])
-        })
-        
-        // Add group total
-        exportData.push([]) // Empty row
-        exportData.push([
-          'GROUP TOTAL',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          groupTotalSalary.toFixed(2)
-        ])
-        exportData.push([]) // Empty row for separation
-        
-        // Create worksheet for this group
-        const ws = XLSX.utils.aoa_to_sheet(exportData)
-        
-        // Set column widths
-        ws['!cols'] = [
-          { width: 20 }, // Name
-          { width: 15 }, // Group
-          { width: 10 }, // Rate
-          { width: 12 }, // Monday
-          { width: 12 }, // Tuesday
-          { width: 12 }, // Wednesday
-          { width: 12 }, // Thursday
-          { width: 12 }, // Friday
-          { width: 12 }, // Saturday
-          { width: 12 }, // Working Days
-          { width: 10 }, // OT Pay
-          { width: 10 }, // Late
-          { width: 10 }, // CA
-          { width: 12 }  // Total Salary
-        ]
-        
-        // Add worksheet to workbook
-        XLSX.utils.book_append_sheet(wb, ws, groupName.substring(0, 31)) // Excel sheet name limit
-      })
-      
-      // Generate filename with current date
-      const currentDate = new Date().toISOString().split('T')[0]
-      const filename = `Site_Payroll_Export_${currentDate}.xlsx`
-      
-      // Save file
-      XLSX.writeFile(wb, filename)
-      
-      setSuccessMessage('Payroll data exported successfully!')
-      setShowSuccessAlert(true)
-      
-    } catch (error) {
-      console.error('Error exporting to Excel:', error)
-      setError('Failed to export payroll data')
-    } finally {
-      setIsExporting(false)
-    }
-  }, [payrollRecords])
-
   // Handle payroll submission
   const handlePayrollSubmit = useCallback(async (data, endpoint) => {
     try {
@@ -2010,6 +1857,279 @@ export default function WorkersPayroll() {
       return matchesSearch && matchesDepartment && matchesGroup;
     });
   }, [payrollRecords, searchTerm, departmentFilter, groupFilter]);
+
+  // Excel Export Function - Now exports filtered data based on search
+  const handleExportToExcel = useCallback(async () => {
+    try {
+      setIsExporting(true)
+      
+      // Use filtered records instead of all payroll records
+      if (filteredRecords.length === 0) {
+        setError('No payroll records found to export based on current filters')
+        return
+      }
+      
+      // Separate site and office records from filtered data
+      const siteRecords = filteredRecords.filter(record => record.payroll_type === 'Site')
+      const officeRecords = filteredRecords.filter(record => record.payroll_type === 'Office')
+      
+      // Create workbook
+      const wb = XLSX.utils.book_new()
+      
+      // Export Site Records if any
+      if (siteRecords.length > 0) {
+        // Group site records by employee group
+        const groupedSiteRecords = siteRecords.reduce((groups, record) => {
+          const group = record.employee_group || 'No Group'
+          if (!groups[group]) {
+            groups[group] = []
+          }
+          groups[group].push(record)
+          return groups
+        }, {})
+        
+        // Process each site group
+        Object.keys(groupedSiteRecords).forEach(groupName => {
+          const groupRecords = groupedSiteRecords[groupName]
+          
+          // Prepare data for this group
+          const exportData = []
+          
+          // Add group header
+          exportData.push([`SITE GROUP: ${groupName}`])
+          exportData.push([]) // Empty row
+          
+          // Add column headers
+          exportData.push([
+            'Name',
+            'Group',
+            'Rate',
+            'Monday',
+            'Tuesday', 
+            'Wednesday',
+            'Thursday',
+            'Friday',
+            'Saturday',
+            'Working Days',
+            'OT Pay',
+            'Late',
+            'CA',
+            'Total Salary'
+          ])
+          
+          let groupTotalSalary = 0
+          
+          // Add employee data
+          groupRecords.forEach(record => {
+            // Parse daily attendance data
+            let dailyAttendance = {}
+            try {
+              dailyAttendance = typeof record.daily_attendance === 'string' 
+                ? JSON.parse(record.daily_attendance) 
+                : record.daily_attendance || {}
+            } catch (e) {
+              console.error('Error parsing daily attendance:', e)
+            }
+            
+            const totalSalary = parseFloat(record.net_pay || 0)
+            groupTotalSalary += totalSalary
+            
+            exportData.push([
+              record.employee_name || '',
+              record.employee_group || '',
+              parseFloat(record.daily_rate || 0).toFixed(2),
+              dailyAttendance.monday ? 'Present' : 'Absent',
+              dailyAttendance.tuesday ? 'Present' : 'Absent',
+              dailyAttendance.wednesday ? 'Present' : 'Absent',
+              dailyAttendance.thursday ? 'Present' : 'Absent',
+              dailyAttendance.friday ? 'Present' : 'Absent',
+              dailyAttendance.saturday ? 'Present' : 'Absent',
+              record.working_days || 0,
+              parseFloat(record.overtime_pay || 0).toFixed(2),
+              parseFloat(record.late_deduction || 0).toFixed(2),
+              parseFloat(record.cash_advance || 0).toFixed(2),
+              totalSalary.toFixed(2)
+            ])
+          })
+          
+          // Add group total
+          exportData.push([]) // Empty row
+          exportData.push([
+            'GROUP TOTAL',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            groupTotalSalary.toFixed(2)
+          ])
+          exportData.push([]) // Empty row for separation
+          
+          // Create worksheet for this group
+          const ws = XLSX.utils.aoa_to_sheet(exportData)
+          
+          // Set column widths
+          ws['!cols'] = [
+            { width: 20 }, // Name
+            { width: 15 }, // Group
+            { width: 10 }, // Rate
+            { width: 12 }, // Monday
+            { width: 12 }, // Tuesday
+            { width: 12 }, // Wednesday
+            { width: 12 }, // Thursday
+            { width: 12 }, // Friday
+            { width: 12 }, // Saturday
+            { width: 12 }, // Working Days
+            { width: 10 }, // OT Pay
+            { width: 10 }, // Late
+            { width: 10 }, // CA
+            { width: 12 }  // Total Salary
+          ]
+          
+          // Add worksheet to workbook
+          XLSX.utils.book_append_sheet(wb, ws, `Site_${groupName}`.substring(0, 31)) // Excel sheet name limit
+        })
+      }
+      
+      // Export Office Records if any
+      if (officeRecords.length > 0) {
+        // Group office records by employee group
+        const groupedOfficeRecords = officeRecords.reduce((groups, record) => {
+          const group = record.employee_group || 'No Group'
+          if (!groups[group]) {
+            groups[group] = []
+          }
+          groups[group].push(record)
+          return groups
+        }, {})
+        
+        // Process each office group
+        Object.keys(groupedOfficeRecords).forEach(groupName => {
+          const groupRecords = groupedOfficeRecords[groupName]
+          
+          // Prepare data for this group
+          const exportData = []
+          
+          // Add group header
+          exportData.push([`OFFICE GROUP: ${groupName}`])
+          exportData.push([]) // Empty row
+          
+          // Add column headers for office payroll
+          exportData.push([
+            'Name',
+            'Group',
+            'Position',
+            'Working Days',
+            'OT Hours',
+            'Late (mins)',
+            'Basic Pay',
+            'OT Pay',
+            'Gross Pay',
+            'Late Deduction',
+            'Cash Advance',
+            'Other Deductions',
+            'Total Deductions',
+            'Net Pay'
+          ])
+          
+          let groupTotalNetPay = 0
+          
+          // Add employee data
+          groupRecords.forEach(record => {
+            const netPay = parseFloat(record.net_pay || 0)
+            groupTotalNetPay += netPay
+            
+            exportData.push([
+              record.employee_name || '',
+              record.employee_group || '',
+              record.position || '',
+              record.total_working_days || 0,
+              parseFloat(record.total_overtime_hours || 0).toFixed(1),
+              parseFloat(record.total_late_minutes || 0).toFixed(0),
+              parseFloat(record.basic_pay || 0).toFixed(2),
+              parseFloat(record.overtime_pay || 0).toFixed(2),
+              parseFloat(record.gross_pay || 0).toFixed(2),
+              parseFloat(record.late_deduction || 0).toFixed(2),
+              parseFloat(record.cash_advance || 0).toFixed(2),
+              parseFloat(record.others_deduction || 0).toFixed(2),
+              parseFloat(record.total_deductions || 0).toFixed(2),
+              netPay.toFixed(2)
+            ])
+          })
+          
+          // Add group total
+          exportData.push([]) // Empty row
+          exportData.push([
+            'GROUP TOTAL',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            groupTotalNetPay.toFixed(2)
+          ])
+          exportData.push([]) // Empty row for separation
+          
+          // Create worksheet for this group
+          const ws = XLSX.utils.aoa_to_sheet(exportData)
+          
+          // Set column widths
+          ws['!cols'] = [
+            { width: 20 }, // Name
+            { width: 15 }, // Group
+            { width: 15 }, // Position
+            { width: 12 }, // Working Days
+            { width: 10 }, // OT Hours
+            { width: 12 }, // Late (mins)
+            { width: 12 }, // Basic Pay
+            { width: 10 }, // OT Pay
+            { width: 12 }, // Gross Pay
+            { width: 12 }, // Late Deduction
+            { width: 12 }, // Cash Advance
+            { width: 12 }, // Other Deductions
+            { width: 12 }, // Total Deductions
+            { width: 12 }  // Net Pay
+          ]
+          
+          // Add worksheet to workbook
+          XLSX.utils.book_append_sheet(wb, ws, `Office_${groupName}`.substring(0, 31)) // Excel sheet name limit
+        })
+      }
+      
+      // Generate filename with current date and search info
+      const currentDate = new Date().toISOString().split('T')[0]
+      const searchInfo = searchTerm ? `_Search_${searchTerm.replace(/[^a-zA-Z0-9]/g, '_')}` : ''
+      const filename = `Payroll_Export${searchInfo}_${currentDate}.xlsx`
+      
+      // Save file
+      XLSX.writeFile(wb, filename)
+      
+      const recordCount = filteredRecords.length
+      const searchText = searchTerm ? ` (filtered by: "${searchTerm}")` : ''
+      setSuccessMessage(`${recordCount} payroll record(s) exported successfully${searchText}!`)
+      setShowSuccessAlert(true)
+      
+    } catch (error) {
+      console.error('Error exporting to Excel:', error)
+      setError('Failed to export payroll data')
+    } finally {
+      setIsExporting(false)
+    }
+  }, [filteredRecords, searchTerm])
 
   const summaryStats = useMemo(() => {
     const totalRecords = filteredRecords.length;
@@ -2319,8 +2439,9 @@ export default function WorkersPayroll() {
     <div className="md:col-span-1">
       <Button
         onClick={handleExportToExcel}
-        disabled={isExporting}
-        className="w-full bg-green-600 hover:bg-green-700 text-white"
+        disabled={isExporting || filteredRecords.length === 0}
+        className="w-full bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-400"
+        title={filteredRecords.length === 0 ? 'No records to export' : `Export ${filteredRecords.length} filtered record(s)`}
       >
         {isExporting ? (
           <>

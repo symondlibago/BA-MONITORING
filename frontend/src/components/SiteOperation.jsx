@@ -310,7 +310,7 @@ function CustomDropdown({ options, value, onChange, placeholder, className = "",
 }
 
 // Daily Update Modal Component
-function DailyUpdateModal({ isOpen, onClose, onSubmit, initialData, projectId }) {
+function DailyUpdateModal({ isOpen, onClose, onSubmit, initialData, projectId, isSubmitting }) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     weather: '',
@@ -655,15 +655,24 @@ function DailyUpdateModal({ isOpen, onClose, onSubmit, initialData, projectId })
                   type="button"
                   variant="outline"
                   onClick={onClose}
+                  disabled={isSubmitting}
                   className="border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
+                  disabled={isSubmitting}
                   className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] text-white hover:opacity-90 transition-opacity"
                 >
-                  {initialData ? 'Update' : 'Add'} Daily Update
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {initialData ? 'Updating...' : 'Adding...'}
+                    </>
+                  ) : (
+                    `${initialData ? 'Update' : 'Add'} Daily Update`
+                  )}
                 </Button>
               </div>
             </form>
@@ -675,7 +684,7 @@ function DailyUpdateModal({ isOpen, onClose, onSubmit, initialData, projectId })
 }
 
 // Project Modal Component
-function ProjectModal({ isOpen, onClose, onSubmit, initialData }) {
+function ProjectModal({ isOpen, onClose, onSubmit, initialData, isSubmitting }) {
   const [formData, setFormData] = useState({
     project_name: '',
     project_location: ''
@@ -782,15 +791,24 @@ function ProjectModal({ isOpen, onClose, onSubmit, initialData }) {
                   type="button"
                   variant="outline"
                   onClick={onClose}
+                  disabled={isSubmitting}
                   className="border-[var(--color-border)] text-[var(--color-foreground)]/70 hover:bg-[var(--color-muted)]"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
+                  disabled={isSubmitting}
                   className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] text-white hover:opacity-90 transition-opacity"
                 >
-                  {initialData ? 'Update' : 'Add'} Project
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {initialData ? 'Updating...' : 'Adding...'}
+                    </>
+                  ) : (
+                    `${initialData ? 'Update' : 'Add'} Project`
+                  )}
                 </Button>
               </div>
             </form>
@@ -821,7 +839,9 @@ function SiteOperation() {
   const [imageGallery, setImageGallery] = useState({ isOpen: false, images: [], initialIndex: 0 })
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, type: '', id: null, projectId: null })
   const [expandedActivities, setExpandedActivities] = useState(new Set())
-
+  const [loadingDailyUpdates, setLoadingDailyUpdates] = useState(new Set())
+  const [isSubmittingProject, setIsSubmittingProject] = useState(false)
+  const [isSubmittingDailyUpdate, setIsSubmittingDailyUpdate] = useState(false)
   // Fetch projects
   const fetchProjects = useCallback(async () => {
     try {
@@ -843,6 +863,9 @@ function SiteOperation() {
   // Fetch daily updates for a project
   const fetchDailyUpdates = useCallback(async (projectId) => {
     try {
+      // Set loading state for this specific project
+      setLoadingDailyUpdates(prev => new Set([...prev, projectId]))
+      
       const response = await fetch(`${API_BASE_URL}/projects/${projectId}/daily-updates`)
       if (response.ok) {
         const data = await response.json()
@@ -852,8 +875,16 @@ function SiteOperation() {
       }
     } catch (error) {
       console.error('Error fetching daily updates:', error)
+    } finally {
+      // Remove loading state for this specific project
+      setLoadingDailyUpdates(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(projectId)
+        return newSet
+      })
     }
   }, [])
+
 
   useEffect(() => {
     fetchProjects()
@@ -877,6 +908,7 @@ function SiteOperation() {
   // Handle project submission (add/edit)
   const handleProjectSubmit = async (formData, projectId = null) => {
     try {
+      setIsSubmittingProject(true)
       const url = projectId 
         ? `${API_BASE_URL}/projects/${projectId}`
         : `${API_BASE_URL}/projects`
@@ -911,12 +943,15 @@ function SiteOperation() {
     } catch (error) {
       console.error('Error saving project:', error)
       alert('Error saving project. Please try again.')
+    } finally {
+      setIsSubmittingProject(false)
     }
   }
 
   // Handle daily update submission (add/edit)
   const handleDailyUpdateSubmit = async (formData, updateId = null) => {
     try {
+      setIsSubmittingDailyUpdate(true)
       const url = updateId 
         ? `${API_BASE_URL}/daily-updates/${updateId}`
         : `${API_BASE_URL}/daily-updates`
@@ -954,6 +989,8 @@ function SiteOperation() {
     } catch (error) {
       console.error('Error saving daily update:', error)
       alert('Error saving daily update. Please try again.')
+    } finally {
+      setIsSubmittingDailyUpdate(false)
     }
   }
 
@@ -1184,7 +1221,7 @@ function SiteOperation() {
                     const projectDate = new Date(p.created_at)
                     const now = new Date()
                     return projectDate.getMonth() === now.getMonth() && 
-                           projectDate.getFullYear() === now.getFullYear()
+                          projectDate.getFullYear() === now.getFullYear()
                   }).length}
                 </p>
               </div>
@@ -1255,19 +1292,24 @@ function SiteOperation() {
                               className="border-b border-[var(--color-border)]/50 hover:bg-gray-100 transition-colors"
                             >
                               <td className="py-3 px-4">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleToggleExpand(project.id)}
-                                  className="text-black hover:bg-[var(--color-muted)] hover:text-white"
-                                >
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleExpand(project.id)}
+                                className="text-black hover:bg-[var(--color-muted)] hover:text-white"
+                                disabled={loadingDailyUpdates.has(project.id)}
+                              >
+                                {loadingDailyUpdates.has(project.id) ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
                                   <motion.div
                                     animate={{ rotate: expandedProjects.has(project.id) ? 90 : 0 }}
                                     transition={{ duration: 0.2 }}
                                   >
                                     <ChevronRight className="h-4 w-4" />
                                   </motion.div>
-                                </Button>
+                                )}
+                              </Button>
                               </td>
                               <td className="py-3 px-4">
                                 <div className="font-medium text-[var(--color-foreground)]">
@@ -1343,13 +1385,18 @@ function SiteOperation() {
                                         </Button>
                                       </div>
                                       
-                                      {dailyUpdates[project.id] && dailyUpdates[project.id].length > 0 ? (
-                                        <div className="space-y-4">
-                                          {dailyUpdates[project.id].map((update) => {
-                                            const activities = update.activity.split('\n').filter(a => a.trim())
-                                            const isExpanded = expandedActivities.has(update.id)
-                                            const displayedActivities = isExpanded ? activities : activities.slice(0, 4)
-                                            const hasMoreActivities = activities.length > 4
+                                      {loadingDailyUpdates.has(project.id) ? (
+                                      <div className="flex items-center justify-center py-8">
+                                        <Loader2 className="h-6 w-6 animate-spin text-[var(--color-primary)]" />
+                                        <span className="ml-2 text-[var(--color-foreground)]/70">Loading daily updates...</span>
+                                      </div>
+                                    ) : dailyUpdates[project.id] && dailyUpdates[project.id].length > 0 ? (
+                                      <div className="space-y-4">
+                                        {dailyUpdates[project.id].map((update) => {
+                                          const activities = update.activity.split('\n').filter(a => a.trim())
+                                          const isExpanded = expandedActivities.has(update.id)
+                                          const displayedActivities = isExpanded ? activities : activities.slice(0, 4)
+                                          const hasMoreActivities = activities.length > 4
 
                                             return (
                                               <div
@@ -1531,6 +1578,7 @@ function SiteOperation() {
         }}
         onSubmit={handleProjectSubmit}
         initialData={editingProject}
+        isSubmitting={isSubmittingProject}
       />
 
       {/* Daily Update Modal */}
@@ -1544,6 +1592,7 @@ function SiteOperation() {
         onSubmit={handleDailyUpdateSubmit}
         initialData={editingDailyUpdate}
         projectId={selectedProjectId}
+        isSubmitting={isSubmittingDailyUpdate}
       />
 
       {/* Delete Confirmation Modal */}
