@@ -27,130 +27,193 @@ import logo from '../assets/pdflogo.png';
 
 
 const addLogo = async (doc) => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const img = new Image();
-      img.src = logo; 
-      img.onload = () => {
-        doc.addImage(img, "PNG", 240, 30, 150, 60); 
-        resolve();
+      
+      // Add error handling
+      img.onerror = () => {
+        console.warn('Logo image failed to load, continuing without logo');
+        resolve(); // Continue without logo instead of failing
       };
+      
+      img.onload = () => {
+        try {
+          // Validate that the image is properly loaded
+          if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+            console.warn('Logo image has invalid dimensions, continuing without logo');
+            resolve();
+            return;
+          }
+          
+          // Create a canvas to convert the image to base64 data URL
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          
+          ctx.drawImage(img, 0, 0);
+          
+          // Get the data URL and validate it's a proper PNG
+          const dataURL = canvas.toDataURL('image/png');
+          
+          // Validate PNG signature
+          if (!dataURL.startsWith('data:image/png;base64,')) {
+            console.warn('Invalid PNG data URL, continuing without logo');
+            resolve();
+            return;
+          }
+          
+          // Extract base64 data and validate it
+          const base64Data = dataURL.split(',')[1];
+          if (!base64Data || base64Data.length === 0) {
+            console.warn('Empty base64 data, continuing without logo');
+            resolve();
+            return;
+          }
+          
+          // Add the image to PDF using the validated data URL
+          doc.addImage(dataURL, "PNG", 240, 30, 150, 60);
+          resolve();
+        } catch (error) {
+          console.warn('Error processing logo image:', error);
+          resolve(); // Continue without logo instead of failing
+        }
+      };
+      
+      // Set crossOrigin to handle CORS issues in production
+      img.crossOrigin = 'anonymous';
+      img.src = logo;
+      
+      // Add timeout to prevent hanging
+      setTimeout(() => {
+        if (!img.complete) {
+          console.warn('Logo loading timeout, continuing without logo');
+          resolve();
+        }
+      }, 5000);
     });
   };
   
-  
+  // Fixed exportToPdf function with better error handling
   const exportToPdf = async (material) => {
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "pt",
-      format: "letter",
-    });
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "pt",
+        format: "letter",
+      });
   
-    await addLogo(doc);
-    generatePdfContent();
-
-    function generatePdfContent() {
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "normal")
-      doc.text("Lot 2-D, Sumpong, Mandumol-Indahag, Cagayan De Oro City", 180, 120)
-
-      doc.setFontSize(16)
-      doc.setFont("helvetica", "bold")
-      doc.text("PURCHASE ORDER", 230, 150)
-
-      // Add Purchase Order Date and Number
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "normal")
-      doc.text(`Purchase Order Date: ${material.date ? new Date(material.date).toLocaleDateString() : ''}`, 50, 180)
-      doc.text("Purchase Order Number:", 350, 180)
-
-      doc.setLineWidth(1)
-      doc.rect(50, 190, 250, 80) // Supplier box
-      doc.rect(300, 190, 250, 80) // Delivery box
-
-      // Blue header backgrounds for supplier and delivery
-      doc.setFillColor(173, 216, 230) // Light blue color
-      doc.rect(50, 190, 250, 20, 'F') // Supplier header background
-      doc.rect(300, 190, 250, 20, 'F') // Delivery header background
-
-      doc.setFontSize(12)
-      doc.setFont("helvetica", "bold")
-      doc.text("SUPPLIER", 150, 203)
-      doc.text("DELIVERY", 400, 203)
-
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "normal")
-      doc.text("Supplier Name:", 60, 225)
-      doc.text("Address:", 60, 240)
-      doc.text("Phone No.:", 60, 255)
-
-      doc.text(`Project: ${material.project}`, 310, 225)
-      doc.text(`Location: ${material.project_location}`, 310, 240)
-      doc.text("Owner:", 310, 255)
-
-      // Materials Table with blue header
-      doc.setLineWidth(1)
-      
-      // Blue header background for materials table
-      doc.setFillColor(173, 216, 230) // Light blue color
-      doc.rect(50, 290, 500, 25, 'F') // Header background
-      
-      // Table borders
-      doc.rect(50, 290, 500, 25) // Header row border
-      doc.rect(50, 315, 500, 250) // Content area border
-      
-      // Column separators
-      doc.line(320, 290, 320, 565) // After Description
-      doc.line(390, 290, 390, 565) // After Quantity  
-      doc.line(460, 290, 460, 565) // After Unit Price
-
-      doc.setFontSize(12)
-      doc.setFont("helvetica", "bold")
-      doc.text("DESCRIPTION", 155, 307)
-      doc.text("QUANTITY", 325, 307)
-      doc.text("UNIT PRICE", 390, 307)
-      doc.text("AMOUNT", 480, 307)
-
-      // Add materials and quantities with proper row lines
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "normal")
-      const materialsList = material.materials ? material.materials.split("\n").filter(item => item.trim()) : []
-      const quantityList = material.quantity ? material.quantity.split("\n").filter(item => item.trim()) : []
-
-      let yPos = 335
-      const rowHeight = 20
-      
-      for (let i = 0; i < Math.max(materialsList.length, 10); i++) {
-        // Add horizontal line for each row
-        if (i > 0) {
-          doc.line(50, yPos - 10, 550, yPos - 10)
-        }
-        
-        if (i < materialsList.length) {
-          doc.text(materialsList[i].trim(), 60, yPos)
-          doc.text(quantityList[i] ? quantityList[i].trim() : "", 340, yPos)
-        }
-        
-        yPos += rowHeight
-        if (yPos > 550) break // Prevent overflow
+      // Try to add logo, but don't fail if it doesn't work
+      try {
+        await addLogo(doc);
+      } catch (error) {
+        console.warn('Failed to add logo, continuing with PDF generation:', error);
       }
-
-      // Footer section
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "normal")
-      doc.text("APPROVED BY:", 50, 590)
-      doc.line(50, 620, 200, 620) // Signature line
-      doc.text("Authorized Signature", 50, 635)
-
-      doc.text("Subtotal:", 380, 590)
-      doc.text("Sales Tax (%):", 380, 605)
-      doc.text("Total Amount:", 380, 620)
-
-      doc.save(`purchase_order_${material.project.replace(/\s/g, '_')}.pdf`)
-    }
-
-    // If no logo loading is attempted, generate content immediately
-    if (!document.querySelector('img[src*="pdflogo.png"]')) {
-      generatePdfContent()
+  
+      generatePdfContent();
+  
+      function generatePdfContent() {
+        doc.setFontSize(10)
+        doc.setFont("helvetica", "normal")
+        doc.text("Lot 2-D, Sumpong, Mandumol-Indahag, Cagayan De Oro City", 180, 120)
+  
+        doc.setFontSize(16)
+        doc.setFont("helvetica", "bold")
+        doc.text("PURCHASE ORDER", 230, 150)
+  
+        // Add Purchase Order Date and Number
+        doc.setFontSize(10)
+        doc.setFont("helvetica", "normal")
+        doc.text(`Purchase Order Date: ${material.date ? new Date(material.date).toLocaleDateString() : ''}`, 50, 180)
+        doc.text("Purchase Order Number:", 350, 180)
+  
+        doc.setLineWidth(1)
+        doc.rect(50, 190, 250, 80) // Supplier box
+        doc.rect(300, 190, 250, 80) // Delivery box
+  
+        // Blue header backgrounds for supplier and delivery
+        doc.setFillColor(173, 216, 230) // Light blue color
+        doc.rect(50, 190, 250, 20, 'F') // Supplier header background
+        doc.rect(300, 190, 250, 20, 'F') // Delivery header background
+  
+        doc.setFontSize(12)
+        doc.setFont("helvetica", "bold")
+        doc.text("SUPPLIER", 150, 203)
+        doc.text("DELIVERY", 400, 203)
+  
+        doc.setFontSize(10)
+        doc.setFont("helvetica", "normal")
+        doc.text("Supplier Name:", 60, 225)
+        doc.text("Address:", 60, 240)
+        doc.text("Phone No.:", 60, 255)
+  
+        doc.text(`Project: ${material.project}`, 310, 225)
+        doc.text(`Location: ${material.project_location}`, 310, 240)
+        doc.text("Owner:", 310, 255)
+  
+        // Materials Table with blue header
+        doc.setLineWidth(1)
+        
+        // Blue header background for materials table
+        doc.setFillColor(173, 216, 230) // Light blue color
+        doc.rect(50, 290, 500, 25, 'F') // Header background
+        
+        // Table borders
+        doc.rect(50, 290, 500, 25) // Header row border
+        doc.rect(50, 315, 500, 250) // Content area border
+        
+        // Column separators
+        doc.line(320, 290, 320, 565) // After Description
+        doc.line(390, 290, 390, 565) // After Quantity  
+        doc.line(460, 290, 460, 565) // After Unit Price
+  
+        doc.setFontSize(12)
+        doc.setFont("helvetica", "bold")
+        doc.text("DESCRIPTION", 155, 307)
+        doc.text("QUANTITY", 325, 307)
+        doc.text("UNIT PRICE", 390, 307)
+        doc.text("AMOUNT", 480, 307)
+  
+        // Add materials and quantities with proper row lines
+        doc.setFontSize(10)
+        doc.setFont("helvetica", "normal")
+        const materialsList = material.materials ? material.materials.split("\n").filter(item => item.trim()) : []
+        const quantityList = material.quantity ? material.quantity.split("\n").filter(item => item.trim()) : []
+  
+        let yPos = 335
+        const rowHeight = 20
+        
+        for (let i = 0; i < Math.max(materialsList.length, 10); i++) {
+          // Add horizontal line for each row
+          if (i > 0) {
+            doc.line(50, yPos - 10, 550, yPos - 10)
+          }
+          
+          if (i < materialsList.length) {
+            doc.text(materialsList[i].trim(), 60, yPos)
+            doc.text(quantityList[i] ? quantityList[i].trim() : "", 340, yPos)
+          }
+          
+          yPos += rowHeight
+          if (yPos > 550) break // Prevent overflow
+        }
+  
+        // Footer section
+        doc.setFontSize(10)
+        doc.setFont("helvetica", "normal")
+        doc.text("APPROVED BY:", 50, 590)
+        doc.line(50, 620, 200, 620) // Signature line
+        doc.text("Authorized Signature", 50, 635)
+  
+        doc.text("Subtotal:", 380, 590)
+        doc.text("Sales Tax (%):", 380, 605)
+        doc.text("Total Amount:", 380, 620)
+  
+        doc.save(`purchase_order_${material.project.replace(/\s/g, '_')}.pdf`)
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
     }
   }
 
