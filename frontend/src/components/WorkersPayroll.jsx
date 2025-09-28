@@ -1552,6 +1552,7 @@ export default function WorkersPayroll() {
   const [searchTerm, setSearchTerm] = useState('')
   const [departmentFilter, setDepartmentFilter] = useState('all')
   const [groupFilter, setGroupFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [viewMode, setViewMode] = useState('card')
   const [isExporting, setIsExporting] = useState(false)
   
@@ -1853,10 +1854,11 @@ export default function WorkersPayroll() {
       
       const matchesDepartment = departmentFilter === 'all' || record.payroll_type === departmentFilter;
       const matchesGroup = groupFilter === 'all' || record.employee_group === groupFilter;
+      const matchesStatus = statusFilter === 'all' || record.status === statusFilter;
       
-      return matchesSearch && matchesDepartment && matchesGroup;
+      return matchesSearch && matchesDepartment && matchesGroup && matchesStatus;
     });
-  }, [payrollRecords, searchTerm, departmentFilter, groupFilter]);
+  }, [payrollRecords, searchTerm, departmentFilter, groupFilter, statusFilter]);
 
   // Excel Export Function - Now exports filtered data based on search
   const handleExportToExcel = useCallback(async () => {
@@ -2113,14 +2115,16 @@ export default function WorkersPayroll() {
       // Generate filename with current date and search info
       const currentDate = new Date().toISOString().split('T')[0]
       const searchInfo = searchTerm ? `_Search_${searchTerm.replace(/[^a-zA-Z0-9]/g, '_')}` : ''
-      const filename = `Payroll_Export${searchInfo}_${currentDate}.xlsx`
+      const statusInfo = statusFilter !== 'all' ? `_Status_${statusFilter}` : ''
+      const filename = `Payroll_Export${searchInfo}${statusInfo}_${currentDate}.xlsx`
       
       // Save file
       XLSX.writeFile(wb, filename)
       
       const recordCount = filteredRecords.length
       const searchText = searchTerm ? ` (filtered by: "${searchTerm}")` : ''
-      setSuccessMessage(`${recordCount} payroll record(s) exported successfully${searchText}!`)
+      const statusText = statusFilter !== 'all' ? ` (status: "${statusFilter}")` : ''
+      setSuccessMessage(`${recordCount} payroll record(s) exported successfully${searchText}${statusText}!`)
       setShowSuccessAlert(true)
       
     } catch (error) {
@@ -2129,7 +2133,7 @@ export default function WorkersPayroll() {
     } finally {
       setIsExporting(false)
     }
-  }, [filteredRecords, searchTerm])
+  }, [filteredRecords, searchTerm, statusFilter])
 
   const summaryStats = useMemo(() => {
     const totalRecords = filteredRecords.length;
@@ -2157,6 +2161,15 @@ export default function WorkersPayroll() {
   const groupOptions = [
     { value: 'all', label: 'All Groups' },
     ...groups.map(group => ({ value: group, label: group }))
+  ]
+
+  // Status options for dropdown
+  const statusOptions = [
+    { value: 'all', label: 'All Status' },
+    { value: 'Pending', label: 'Pending' },
+    { value: 'Processing', label: 'Processing' },
+    { value: 'Paid', label: 'Paid' },
+    { value: 'On Hold', label: 'On Hold' }
   ]
 
   // Status badge component
@@ -2400,10 +2413,12 @@ export default function WorkersPayroll() {
   initial={{ opacity: 0, y: 20 }}
   animate={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.5, delay: 0.3 }}
-  className="bg-white rounded-lg shadow-md p-6"
+  className="bg-white rounded-lg shadow-md p-4" // Reduced padding slightly for a tighter look
 >
-  <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-    {/* Search bar (takes 3 columns on md+) */}
+  {/* Using a 12-column grid for more flexibility */}
+  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+    
+    {/* Search bar (takes 3 columns) */}
     <div className="relative md:col-span-3">
       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
       <input
@@ -2411,36 +2426,46 @@ export default function WorkersPayroll() {
         placeholder="Search employees..."
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
-        className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+        className="w-full pl-10 pr-4 py-2 border rounded-md focus:border-blue-500 focus:outline-none"
       />
     </div>
 
-    {/* Department filter (1 column) */}
-    <div className="md:col-span-1">
+    {/* Department filter (takes 2 columns) */}
+    <div className="md:col-span-2">
       <CustomDropdown
         value={departmentFilter}
         onChange={setDepartmentFilter}
         options={departmentOptions}
-        placeholder="Filter by department"
+        placeholder="All Departments"
       />
     </div>
 
-    {/* Group filter (1 column) */}
-    <div className="md:col-span-1">
+    {/* Group filter (takes 2 columns) */}
+    <div className="md:col-span-2">
       <CustomDropdown
         value={groupFilter}
         onChange={setGroupFilter}
         options={groupOptions}
-        placeholder="Filter by group"
+        placeholder="All Groups"
       />
     </div>
 
-    {/* Export button (1 column, same as filters) */}
-    <div className="md:col-span-1">
+    {/* Status filter (takes 2 columns) */}
+    <div className="md:col-span-2">
+      <CustomDropdown
+        value={statusFilter}
+        onChange={setStatusFilter}
+        options={statusOptions}
+        placeholder="Filter by status"
+      />
+    </div>
+
+    {/* Export button (takes 3 columns) */}
+    <div className="md:col-span-3">
       <Button
         onClick={handleExportToExcel}
         disabled={isExporting || filteredRecords.length === 0}
-        className="w-full bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-400"
+        className="w-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center disabled:bg-gray-400"
         title={filteredRecords.length === 0 ? 'No records to export' : `Export ${filteredRecords.length} filtered record(s)`}
       >
         {isExporting ? (
@@ -2456,6 +2481,7 @@ export default function WorkersPayroll() {
         )}
       </Button>
     </div>
+    
   </div>
 </motion.div>
 
