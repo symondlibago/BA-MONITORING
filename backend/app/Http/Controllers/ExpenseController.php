@@ -20,6 +20,7 @@ class ExpenseController extends Controller
             'description' => ($isUpdate ? 'sometimes|' : '') . 'required|string',
             'location' => 'nullable|string|max:255',
             'store' => 'nullable|string|max:255',
+            'tin' => 'nullable|string|max:255',
             'quantity' => 'nullable|string|max:255',
             'size_dimension' => 'nullable|string|max:255',
             'unit_price' => 'nullable|numeric|min:0',
@@ -102,6 +103,7 @@ class ExpenseController extends Controller
                 'description' => $request->description,
                 'location' => $request->location,
                 'store' => $request->store,
+                'tin' => $request->tin,
                 'quantity' => $request->quantity,
                 'size_dimension' => $request->size_dimension,
                 'unit_price' => $request->unit_price,
@@ -202,6 +204,10 @@ class ExpenseController extends Controller
             
             if ($request->has('store')) {
                 $updateData['store'] = $request->store;
+            }
+
+            if ($request->has('tin')) {
+                $updateData['tin'] = $request->tin;
             }
             
             if ($request->has('quantity')) {
@@ -359,6 +365,7 @@ class ExpenseController extends Controller
                 $expenses = Expense::where('description', 'LIKE', '%' . $query . '%')
                                   ->orWhere('location', 'LIKE', '%' . $query . '%')
                                   ->orWhere('store', 'LIKE', '%' . $query . '%')
+                                  ->orWhere('tin', 'LIKE', '%' . $query . '%')
                                   ->orWhere('category', 'LIKE', '%' . $query . '%')
                                   ->orWhere('or_si_no', 'LIKE', '%' . $query . '%')
                                   ->orderBy('created_at', 'desc')
@@ -374,5 +381,26 @@ class ExpenseController extends Controller
             return $this->errorResponse('Failed to search expenses', $e);
         }
     }
-}
 
+    /**
+     * Get all unique TIN numbers for autocomplete suggestions
+     */
+    public function getTinSuggestions(): JsonResponse
+    {
+        try {
+            $tins = Expense::whereNotNull('tin')
+                          ->where('tin', '!=', '')
+                          ->distinct()
+                          ->pluck('tin')
+                          ->values();
+
+            return response()->json([
+                'success' => true,
+                'data' => $tins
+            ]);
+
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to fetch TIN suggestions', $e);
+        }
+    }
+}

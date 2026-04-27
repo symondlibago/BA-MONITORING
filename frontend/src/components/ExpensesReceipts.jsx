@@ -214,8 +214,13 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
     category: 'Plumbing',
     location: '',
     store: '',
+    tin: '',
     images: []
   })
+  const [tinSuggestions, setTinSuggestions] = useState([])
+  const [tinDropdownOpen, setTinDropdownOpen] = useState(false)
+  const [filteredTins, setFilteredTins] = useState([])
+  const tinRef = useRef(null)
 
   const [selectedImages, setSelectedImages] = useState([])
   const fileInputRef = useRef(null)
@@ -235,6 +240,7 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
         category: initialData.category || 'Plumbing',
         location: initialData.location || '',
         store: initialData.store || '',
+        tin: initialData.tin || '',
         images: initialData.images || []
       })
     } else {
@@ -251,11 +257,33 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
         category: 'Plumbing',
         location: '',
         store: '',
+        tin: '',
         images: []
       })
     }
     setSelectedImages([])
   }, [initialData])
+
+  // Fetch TIN suggestions from backend when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetch(`${API_BASE_URL}/expenses/tin-suggestions`)
+        .then(r => r.json())
+        .then(json => { if (json.success) setTinSuggestions(json.data || []) })
+        .catch(() => {})
+    }
+  }, [isOpen])
+
+  // Close TIN dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (tinRef.current && !tinRef.current.contains(e.target)) {
+        setTinDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const handleInputChange = (field, value) => {
     setFormData(prev => {
@@ -270,6 +298,38 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
       
       return newData
     })
+  }
+
+  const handleTinChange = (value) => {
+    handleInputChange('tin', value)
+    if (value.trim() === '') {
+      setFilteredTins([])
+      setTinDropdownOpen(false)
+    } else {
+      const matches = tinSuggestions.filter(t =>
+        t.toLowerCase().includes(value.toLowerCase()) && t.toLowerCase() !== value.toLowerCase()
+      )
+      setFilteredTins(matches)
+      setTinDropdownOpen(matches.length > 0)
+    }
+  }
+
+  const handleTinKeyDown = (e) => {
+    if (e.key === 'Tab' && filteredTins.length > 0) {
+      e.preventDefault()
+      handleInputChange('tin', filteredTins[0])
+      setTinDropdownOpen(false)
+      setFilteredTins([])
+    }
+    if (e.key === 'Escape') {
+      setTinDropdownOpen(false)
+    }
+  }
+
+  const selectTinSuggestion = (tin) => {
+    handleInputChange('tin', tin)
+    setTinDropdownOpen(false)
+    setFilteredTins([])
   }
 
   const handleImageUpload = (e) => {
@@ -309,6 +369,7 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
     if (formData.category) submitData.append('category', formData.category)
     if (formData.location) submitData.append('location', formData.location)
     if (formData.store) submitData.append('store', formData.store)
+    if (formData.tin) submitData.append('tin', formData.tin)
     
     // Add images
     selectedImages.forEach((image, index) => {
@@ -586,18 +647,79 @@ function ExpenseModal({ isOpen, onClose, onSubmit, initialData }) {
                 </div>
               </div>
 
-              {/* Store */}
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                  Store
-                </label>
-                <input
-                  type="text"
-                  value={formData.store}
-                  onChange={(e) => handleInputChange('store', e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                  placeholder="e.g., Main Store, Online Shop"
-                />
+              {/* Store + TIN */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Store */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
+                    Store
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.store}
+                    onChange={(e) => handleInputChange('store', e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                    placeholder="e.g., Main Store, Online Shop"
+                  />
+                </div>
+
+                {/* TIN with autocomplete */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
+                    TIN
+                  </label>
+                  <div className="relative" ref={tinRef}>
+                    <input
+                      type="text"
+                      value={formData.tin}
+                      onChange={(e) => handleTinChange(e.target.value)}
+                      onKeyDown={handleTinKeyDown}
+                      onFocus={() => {
+                        if (filteredTins.length > 0) setTinDropdownOpen(true)
+                      }}
+                      className="w-full px-3 py-2 bg-[var(--color-input)] border border-[var(--color-border)] rounded-lg text-[var(--color-foreground)] focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                      placeholder="e.g., 123-456-789-000"
+                      autoComplete="off"
+                    />
+                    {/* Ghost autocomplete hint */}
+                    {filteredTins.length > 0 && formData.tin && (
+                      <div className="absolute inset-y-0 left-0 flex items-center px-3 pointer-events-none">
+                        <span className="invisible">{formData.tin}</span>
+                        <span className="text-[var(--color-foreground)]/30 text-sm">
+                          {filteredTins[0].slice(formData.tin.length)}
+                        </span>
+                      </div>
+                    )}
+                    {/* Dropdown suggestions */}
+                    <AnimatePresence>
+                      {tinDropdownOpen && filteredTins.length > 0 && (
+                        <motion.ul
+                          initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute z-50 w-full mt-1 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                        >
+                          {filteredTins.map((tin, i) => (
+                            <li key={i}>
+                              <button
+                                type="button"
+                                onMouseDown={(e) => { e.preventDefault(); selectTinSuggestion(tin) }}
+                                className="w-full text-left px-4 py-2 text-sm text-[var(--color-foreground)] hover:bg-[var(--color-primary)]/10 hover:text-[var(--color-primary)] transition-colors"
+                              >
+                                <span className="text-[var(--color-primary)] font-medium">{tin.slice(0, formData.tin.length)}</span>
+                                <span>{tin.slice(formData.tin.length)}</span>
+                              </button>
+                            </li>
+                          ))}
+                          <li className="px-4 py-1.5 text-xs text-[var(--color-foreground)]/40 border-t border-[var(--color-border)]">
+                            Press <kbd className="px-1 py-0.5 bg-[var(--color-muted)] rounded text-[10px]">Tab</kbd> to autocomplete
+                          </li>
+                        </motion.ul>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
               </div>
 
               {/* Form Actions */}
@@ -1003,6 +1125,7 @@ function ExpensesReceipts() {
       'Size/Dimension': expense.size_dimension,
       'Location': expense.location,
       'Store': expense.store,
+      'TIN': expense.tin,
       'Date Created': new Date(expense.created_at).toLocaleDateString()
     }))
 
@@ -1405,4 +1528,3 @@ const getImageCount = (expense) => {
 }
 
 export default ExpensesReceipts
-

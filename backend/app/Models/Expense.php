@@ -15,6 +15,7 @@ class Expense extends Model
         'description',
         'location',
         'store',
+        'tin', // Tax Identification Number
         'quantity', // Now string instead of integer
         'size_dimension',
         'unit_price',
@@ -83,4 +84,3 @@ class Expense extends Model
         }, $images);
     }
 }
-
